@@ -1,9 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul  1 12:07:12 2019
+Created on Sat Jul 13 14:25:56 2019
 
 @author: Johnny Tsao
 """
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir) 
+
+import poisson_helper_functions as hf
 
 import numpy as np
 import matplotlib as mpl
@@ -13,7 +19,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from numpy import linalg as la
 
-import poisson_helper_functions as hf
+#adding to denominator to avoid 0/0 error
+singular_null = 1.0e-17
 
 def setup_grid(N_grid_val = 101):
     # grid dimension
@@ -35,89 +42,51 @@ def setup_grid(N_grid_val = 101):
     global u_init
     u_init = np.zeros_like(xmesh)
 
-def setup_equations(bnd_type_, beta_p_val = 10000):
-    
-    #offset center
-    x0 = 0.6
-    y0 = -0.2
-    
-    #Poisson equation coefficients
-    global beta_p
-    beta_p = beta_p_val
-    global beta_m
-    beta_m = 1.
-    
-    #rhs solution
-    global r0
-    r0 = 0.765467899876
-    def rhs(x,y):
-        return -np.ones_like(x)
-    
-    global rhs_func
-    rhs_func = rhs
-    
-    
-    def level(x,y):
-        return np.array(hf.XYtoR(x,y) - r0)
-    
-    global lvl_func
-    lvl_func = level
-    
-    global bnd_type
-    bnd_type = bnd_type_
-    
-    ##below is for testing existing function purposes
-    ######################################################################
-    def desired_func(x, y):
-        return (1 - 0.25 * ((x - x0)**2 + (y - y0)**2))
-    
-    def solution(x,y):
-        sol = np.heaviside(-lvl_func(x,y),1)*(desired_func(x,y))
-        return sol
-    global sol_func
-    sol_func = solution
-    
-    
-    
-    ##boundary conditions / jump conditions
-    def jump_condition(x,y,u):
-        u_desired = desired_func(x,y)
-        u_n_desired = beta_m * hf.norm_grad(u_desired,(x,y),lvl_func)
-        #for Robin boundary condition only
-        def sigma(x,y):
-            return -0.25 * (hf.XYtoR(x-x0, y-y0)+10**-17)
-        
-        sigma_Robin = sigma(x, y)
-        g_Robin = u_desired + sigma_Robin * u_n_desired
-        #################################
-        
-        if(bnd_type == "Dirichlet"):
-            a_mesh = - u_desired
-            b_mesh = - beta_m * hf.grad_frame(u,(x,y),lvl_func)
-            
-        elif(bnd_type == "Neumann"):
-            a_mesh = - u
-            b_mesh = - beta_m * u_n_desired
-        
-        elif(bnd_type == "Robin_u"):
-            a_mesh = - u
-            b_mesh = - beta_m * (g_Robin - u)/sigma_Robin
-            
-        elif(bnd_type == "Robin_u_n"):
-            a_mesh = -(g_Robin - sigma_Robin*u_n_desired)
-            b_mesh = - beta_m * hf.grad_frame(u,(x,y),lvl_func)
-            
-        elif(bnd_type == "exact"):
-            a_mesh = - u_desired
-            b_mesh = - beta_m * u_n_desired
-        else:
-            raise Exception("error: invalid boundary format")
-        return (a_mesh, b_mesh)
+#discretization of Step, Delta functions
+def I(phi):
+    return np.heaviside(phi,1)*phi
 
-    global jmp_func
-    jmp_func = jump_condition
-    ######################################################################
-    
+def J(phi):
+    return 1./2 * np.heaviside(phi,1)*phi**2
+
+def K(phi):
+    return 1./6 * np.heaviside(phi,1)*phi**3
+
+#Characteristic function of N1
+##Chi is 1 if in N1
+##       0 if not in N1
+def Chi(phi):
+    ret = np.zeros_like(phi)
+    ret[:-1,:] += np.heaviside(-phi[:-1,:]*phi[ 1:,:],1)
+    ret[ 1:,:] += np.heaviside(-phi[:-1,:]*phi[ 1:,:],1)
+    ret[:,:-1] += np.heaviside(-phi[:,:-1]*phi[ :,1:],1)
+    ret[:, 1:] += np.heaviside(-phi[:,:-1]*phi[ :,1:],1)
+    return np.heaviside(ret,0)
+
+def H(phi,h):
+#    I_mat = I(phi)
+    J_mat = J(phi)
+    K_mat = K(phi)
+    first_term = hf.laplace(J_mat,h,h) / (hf.abs_grad(phi,h,h)**2 + singular_null)
+    first_term -= (hf.laplace(K_mat,h,h) - J_mat*hf.laplace(phi,h,h))*hf.laplace(phi,h,h) / (hf.abs_grad(phi,h,h)**4 + singular_null)
+    second_term = np.heaviside(phi,1)
+    return Chi(phi) * first_term + (1-Chi(phi)) * second_term
+
+def delta(phi,h):
+    I_mat = I(phi)
+    J_mat = J(phi)
+#    K_mat = K(phi)
+    first_term = hf.laplace(I_mat,h,h) / (hf.abs_grad(phi,h,h)**2 + singular_null)
+    first_term -= (hf.laplace(J_mat,h,h) - I_mat*hf.laplace(phi,h,h))*hf.laplace(phi,h,h) / (hf.abs_grad(phi,h,h)**4 + singular_null)
+    return Chi(phi) * first_term
+
+def source(a, b, mesh, phi):
+    xmesh, ymesh = mesh
+    h = xmesh[0,1]-xmesh[0,0]
+    S_mat = np.zeros_like(xmesh)
+    H_mat = H(phi,h)
+    S += hf.laplace(b * H_mat)
+
 def poisson_jacobi_solver(u_init_, maxIterNum_, mesh_, beta_, rhs_func_, lvl_func_, jmp_func_):
     xmesh, ymesh = mesh_
     beta_p, beta_m = beta_
@@ -275,35 +244,13 @@ def poisson_jacobi_solver(u_init_, maxIterNum_, mesh_, beta_, rhs_func_, lvl_fun
             sys.stdout.flush()
     print("")
     return u
-
-if(__name__ == "__main__"):
-    ##generate poisson solver
-    plt.close("all")
-    setup_grid(101)
-    u_cur_result = u_init
-    for i in range(10):
-        setup_equations("Neumann")
-        u_result = poisson_jacobi_solver(u_cur_result, 200000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
-        u_n_result = hf.grad_frame(u_result, (xmesh, ymesh), lvl_func)
-#        plt.matshow(u_n_result)
-#        plt.colorbar()
-        fig_label = i
-        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[False,False,False,True])
-        u_cur_result = u_result
-#    initialize()
-#    u_result2 = poisson_jacobi_solver(u_result1, 100000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
-#    u_n_result2 = grad_frame(u_result2, (xmesh, ymesh), lvl_func)
-#    plt.matshow(u_n_result2)
-#    plt.colorbar()
-#    plot3d_all(u_result2, (xmesh, ymesh), sol_func,[False, False,False,True])
-#    b_mesh = -beta_m * u_n[:,:]
-#    a_mesh = -(get_u_from_un(u_n, xmesh, ymesh))
-##    formulism 2
-#    a_mesh = - u[:,:]
-#    b_mesh = -(get_u_from_un(u, xmesh, ymesh))
-else:
-    print("Poisson solver imported")
-
-        
-    
+setup_grid(101)
+r0=0.8
+phi = -np.array(hf.XYtoR(xmesh,ymesh) - r0)
+plt.matshow(Chi(phi))
+plt.colorbar()
+plt.matshow(delta(phi,h))
+plt.colorbar()
+plt.matshow(H(phi,h))
+plt.colorbar()
     

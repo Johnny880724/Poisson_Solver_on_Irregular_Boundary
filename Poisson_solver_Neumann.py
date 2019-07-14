@@ -6,12 +6,12 @@ Created on Mon Jul  8 15:02:57 2019
 """
 
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import Poisson_solver as ps
 import poisson_helper_functions as hf
-from sklearn.linear_model import LinearRegression
 
 def setup_grid(N_grid_val = 101):
     # grid dimension
@@ -119,36 +119,19 @@ def setup_equations(bnd_type_, beta_p_val = 10000):
 if(__name__ == "__main__"):
     ##generate poisson solver
     plt.close("all")
-    
-    #convergence plot
-    grid_array = np.array([16,32,64,80,128,160,200,256,300])+1
-    L2Dif_array = []
-    
-    for i in range(len(grid_array)):
-        setup_grid(grid_array[i])
-        setup_equations("exact")
-        u_cur_result = u_init
+    setup_grid(33)
+    u_cur_result = u_init
+    for i in range(1000):
+        setup_equations("Neumann")
         u_result = ps.poisson_jacobi_solver(u_cur_result, 200000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
         u_n_result = hf.grad_frame(u_result, (xmesh, ymesh), lvl_func)
-    #        plt.matshow(u_n_result)
-    #        plt.colorbar()
-        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,"",[False,False,False,False])
-        maxDif, L2Dif = hf.print_error(u_result, (xmesh, ymesh), sol_func)
-        L2Dif_array.append(L2Dif)
-    l1=np.log(grid_array)
-    l2=np.log(L2Dif_array)
-    plt.plot(l1,l2)
-    plt.plot(np.linspace(min(l1),max(l1),20),np.linspace(max(l2),max(l2)-2*(max(l1)-min(l1)),20))
-    plt.xlabel("log(N_grid)")
-    plt.ylabel("log(error)")
-    plt.title("convergence plot for test 00")
-    plt.legend(["result", "slope = -2"])
-    x=l1.reshape((-1,1))
-    model = LinearRegression().fit(x, l2)
-    plt.plot(x,model.predict(x))
-    plt.plot(l1,l2,".")
-    #the slope is -1.18543593
-    
-else:
-    print("Poisson solver imported")
-    
+#        plt.matshow(u_n_result)
+#        plt.colorbar()
+        fig_label = i
+#        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[False,False,False,False])
+        hf.print_error(u_result, (xmesh, ymesh), sol_func)
+        u_cur_result = u_result
+        u_n_result = hf.grad_frame(u_result,(xmesh,ymesh),lvl_func)
+        u_n_anal = hf.grad_frame(sol_func(xmesh, ymesh),(xmesh,ymesh),lvl_func)
+        print(hf.L_n_norm(np.abs(u_n_result - u_n_anal),2))
+    hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[False,False,False,False])

@@ -14,15 +14,30 @@ def XYtoR(x,y):
     return np.sqrt(x**2+y**2)
 
 def grad(f,dx,dy):
-    ret_x = np.zeros_like(f)
-    ret_y = np.zeros_like(f)
-    ret_y[1:-1,:] = (f[2:,:  ] - f[:-2, :])/(2*dx)
-    ret_x[:,1:-1] = (f[:  ,2:] - f[: ,:-2])/(2*dy)
-    ret_y[0 ,:] = (f[ 1,:] - 0)/dx
-    ret_y[-1,:] = (0 - f[-1,:])/dx
-    ret_x[: , 0] = (f[ :,1] - 0)/dy
-    ret_x[: ,-1] = (0 - f[:,-1])/dy
+#    ret_x = np.zeros_like(f)
+#    ret_y = np.zeros_like(f)
+#    ret_y[1:-1,:] = (f[2:,:  ] - f[:-2, :])/(2*dx)
+#    ret_x[:,1:-1] = (f[:  ,2:] - f[: ,:-2])/(2*dy)
+#    ret_y[0 ,:] = (f[ 1,:] - 0)/dx
+#    ret_y[-1,:] = (0 - f[-1,:])/dx
+#    ret_x[: , 0] = (f[ :,1] - 0)/dy
+#    ret_x[: ,-1] = (0 - f[:,-1])/dy
+    ret_x, ret_y = np.gradient(f,dx,dy)
     return ret_x, ret_y
+
+def abs_grad(f,dx,dy):
+    grad_x, grad_y = np.gradient(f,dx,dy)
+    return np.sqrt(grad_x**2 + grad_y**2)
+
+#def laplacian(f,dx,dy):
+#    grad_x, grad_y = grad(f,dx,dy)
+#    return div(grad_x,grad_y,dx,dy)
+
+def laplace(f,dx,dy):
+    ret = np.zeros_like(f)
+    ret[1:-1,1:-1] = (f[1:-1,2:] + f[1:-1,0:-2] + f[2:,1:-1] + f[0:-2,1:-1] - 4*f[1:-1,1:-1])/dx**2
+#    ret[1:-1,0] = (f[1:-1,2:] + f[1:-1,0:-2] + f[2:,1:-1] + f[0:-2,1:-1] - 4*f[1:-1,1:-1])/dx**2
+    return ret
 
 def norm_grad(u_, mesh_, lvl_func_):
     xmesh, ymesh = mesh_
@@ -109,11 +124,12 @@ def grad_frame(u_, mesh_, lvl_func_):
 def print_error(u_result_, mesh_, sol_func_):
     xmesh,ymesh = mesh_
     dif = np.abs(u_result_ - sol_func_(xmesh,ymesh))
-    print(dif)
+#    print(dif)
     L2Dif = L_n_norm(dif,2)
     maxDif = np.max(dif)
-    print("maximum error: %f" % maxDif)
-    print("L2 error: %f" % L2Dif)
+    print("maximum error: ", maxDif)
+    print("L2 error: ", L2Dif)
+    return maxDif, L2Dif
 
 def plot3d_all(u_result_, mesh_, sol_func_,fig_label_, toPlot_ = [True, True, True, True]):
     xmesh, ymesh = mesh_

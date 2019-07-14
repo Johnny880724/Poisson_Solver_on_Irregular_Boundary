@@ -12,7 +12,7 @@ from matplotlib import cm
 import Poisson_solver as ps
 import poisson_helper_functions as hf
 
-def initialize(jump,N_grid_val = 101, beta_p_val = 10000):
+def initialize(jump,N_grid_val = 101, beta_p_val = 1000000):
     
     #offset center
     x0 = 0.0
@@ -85,7 +85,7 @@ def initialize(jump,N_grid_val = 101, beta_p_val = 10000):
             return np.ones_like(x)
         
         def n(x,y):
-            return -0.25 * (hf.XYtoR(x-x0, y-y0)+10**-17)/beta_m
+            return -0.25 * (hf.XYtoR(x-x0, y-y0)+10**-17)
         
         def g(x,y):
             return np.ones_like(x)
@@ -100,7 +100,7 @@ def initialize(jump,N_grid_val = 101, beta_p_val = 10000):
             a_mesh = -get_u_from_un(u_or_un,x,y)
             b_mesh = -beta_m * u_or_un
         elif (jump == "u"):
-            b_mesh = -get_un_from_u(u_or_un,x,y)
+            b_mesh = -beta_m * get_un_from_u(u_or_un,x,y)
             a_mesh = -u_or_un
         else:
             print("error!!")
@@ -112,16 +112,16 @@ def initialize(jump,N_grid_val = 101, beta_p_val = 10000):
 if(__name__ == "__main__"):
     ##generate poisson solver
     plt.close("all")
-    
-    for i in range(1):
+    initialize("u_n")
+    u_cur_result = sol_func(xmesh,ymesh)
+    for i in range(4):
         initialize("u_n")
-        u_cur_result = u_init
         u_result = ps.poisson_jacobi_solver(u_cur_result, 200000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
         u_n_result = hf.grad_frame(u_result, (xmesh, ymesh), lvl_func)
 #        plt.matshow(u_n_result)
 #        plt.colorbar()
         fig_label = i
-        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[False,True,True,True])
+        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[True,True,True,True])
         u_cur_result = u_result
 #    initialize()
 #    u_result2 = poisson_jacobi_solver(u_result1, 100000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)

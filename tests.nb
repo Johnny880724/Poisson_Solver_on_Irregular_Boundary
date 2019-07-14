@@ -1,0 +1,256 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 11.3' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[      7407,        248]
+NotebookOptionsPosition[      7110,        235]
+NotebookOutlinePosition[      7453,        250]
+CellTagsIndexPosition[      7410,        247]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", "test00", "*)"}], "\[IndentingNewLine]", 
+  RowBox[{
+   RowBox[{"\[Phi]", "=", 
+    RowBox[{
+     SqrtBox[
+      RowBox[{
+       SuperscriptBox["x", "2"], "+", 
+       SuperscriptBox["y", "2"]}]], "-", 
+     SubscriptBox["r", "0"]}]}], "\[IndentingNewLine]", 
+   RowBox[{"u", "=", 
+    RowBox[{"1", "-", 
+     RowBox[{"0.25", 
+      RowBox[{"(", 
+       RowBox[{
+        SuperscriptBox["x", "2"], "+", 
+        SuperscriptBox["y", "2"]}], ")"}]}]}]}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"\[Del]", "u"}], "=", 
+    RowBox[{
+     RowBox[{"-", "0.5"}], 
+     RowBox[{"(", 
+      RowBox[{"x", " ", ",", "y"}], ")"}]}]}], "\[IndentingNewLine]", 
+   RowBox[{
+    SubscriptBox["u", "n"], "=", 
+    RowBox[{
+     RowBox[{"-", "0.5"}], 
+     SqrtBox[
+      RowBox[{
+       SuperscriptBox["x", "2"], "+", 
+       SuperscriptBox["y", "2"]}]]}]}], "\[IndentingNewLine]", 
+   RowBox[{"\[CapitalDelta]u", " ", "=", " ", "1"}], "\[IndentingNewLine]", 
+   "\[IndentingNewLine]", 
+   RowBox[{"(*", "test01", "*)"}], "\[IndentingNewLine]", 
+   RowBox[{"\[Phi]", "=", 
+    RowBox[{
+     SqrtBox[
+      RowBox[{
+       SuperscriptBox["x", "2"], "+", 
+       SuperscriptBox["y", "2"]}]], "-", 
+     SubscriptBox["r", "0"]}]}], "\[IndentingNewLine]", 
+   RowBox[{"u", "=", 
+    RowBox[{"1", "-", 
+     RowBox[{"0.25", 
+      RowBox[{"(", 
+       RowBox[{
+        SuperscriptBox[
+         RowBox[{"(", 
+          RowBox[{"x", "-", 
+           SubscriptBox["x", "0"]}], ")"}], "2"], "+", 
+        SuperscriptBox[
+         RowBox[{"(", 
+          RowBox[{"y", "-", 
+           SubscriptBox["y", "0"]}], ")"}], "2"]}], ")"}]}]}]}], 
+   "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"\[Del]", "u"}], "=", 
+    RowBox[{
+     RowBox[{"-", "0.5"}], 
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"x", "-", 
+        SubscriptBox["x", "0"]}], " ", ",", 
+       RowBox[{"y", "-", 
+        SubscriptBox["y", "0"]}]}], ")"}]}]}], "\[IndentingNewLine]", 
+   RowBox[{
+    SubscriptBox["u", "n"], "=", 
+    RowBox[{
+     RowBox[{"-", "0.5"}], 
+     RowBox[{"(", 
+      RowBox[{
+       FractionBox[
+        RowBox[{"x", 
+         RowBox[{"(", 
+          RowBox[{"x", "-", 
+           SubscriptBox["x", "0"]}], ")"}]}], 
+        SqrtBox[
+         RowBox[{
+          SuperscriptBox["x", "2"], "+", 
+          SuperscriptBox["y", "2"]}]]], "+", 
+       FractionBox[
+        RowBox[{"y", 
+         RowBox[{"(", 
+          RowBox[{"y", "-", 
+           SubscriptBox["y", "0"]}], ")"}]}], 
+        SqrtBox[
+         RowBox[{
+          SuperscriptBox["x", "2"], "+", 
+          SuperscriptBox["y", "2"]}]]]}], ")"}]}]}], "\[IndentingNewLine]", 
+   RowBox[{"\[CapitalDelta]u", " ", "=", " ", "1"}], "\[IndentingNewLine]", 
+   RowBox[{"(*", "test02", "*)"}], "\[IndentingNewLine]", 
+   RowBox[{"\[Phi]", "=", 
+    RowBox[{
+     SqrtBox[
+      RowBox[{
+       SuperscriptBox["x", "2"], "+", 
+       SuperscriptBox["y", "2"]}]], "-", 
+     SubscriptBox["r", "0"]}]}], "\[IndentingNewLine]", 
+   RowBox[{"u", "=", 
+    SuperscriptBox["\[ExponentialE]", 
+     RowBox[{"-", 
+      RowBox[{"(", 
+       RowBox[{
+        SuperscriptBox[
+         RowBox[{"(", 
+          RowBox[{"x", "-", 
+           SubscriptBox["x", "0"]}], ")"}], "2"], "+", 
+        SuperscriptBox[
+         RowBox[{"(", 
+          RowBox[{"y", "-", 
+           SubscriptBox["y", "0"]}], ")"}], "2"]}], ")"}]}]]}], 
+   "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"\[Del]", "u"}], "=", 
+    RowBox[{
+     RowBox[{"-", "2"}], 
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"(", 
+        RowBox[{"x", "-", 
+         SubscriptBox["x", "0"]}], ")"}], " ", ",", 
+       RowBox[{"(", 
+        RowBox[{"y", "-", 
+         SubscriptBox["y", "0"]}], ")"}]}], ")"}], 
+     SuperscriptBox["\[ExponentialE]", 
+      RowBox[{"-", 
+       RowBox[{"(", 
+        RowBox[{
+         SuperscriptBox[
+          RowBox[{"(", 
+           RowBox[{"x", "-", 
+            SubscriptBox["x", "0"]}], ")"}], "2"], "+", 
+         SuperscriptBox[
+          RowBox[{"(", 
+           RowBox[{"y", "-", 
+            SubscriptBox["y", "0"]}], ")"}], "2"]}], ")"}]}]]}]}], 
+   "\[IndentingNewLine]", 
+   RowBox[{
+    SubscriptBox["u", "n"], "=", 
+    RowBox[{
+     RowBox[{"-", "2"}], 
+     RowBox[{"(", 
+      RowBox[{
+       FractionBox[
+        RowBox[{"x", 
+         RowBox[{"(", 
+          RowBox[{"x", "-", 
+           SubscriptBox["x", "0"]}], ")"}]}], 
+        SqrtBox[
+         RowBox[{
+          SuperscriptBox["x", "2"], "+", 
+          SuperscriptBox["y", "2"]}]]], "+", 
+       FractionBox[
+        RowBox[{"y", 
+         RowBox[{"(", 
+          RowBox[{"y", "-", 
+           SubscriptBox["y", "0"]}], ")"}]}], 
+        SqrtBox[
+         RowBox[{
+          SuperscriptBox["x", "2"], "+", 
+          SuperscriptBox["y", "2"]}]]]}], ")"}], 
+     SuperscriptBox["\[ExponentialE]", 
+      RowBox[{"-", 
+       RowBox[{"(", 
+        RowBox[{
+         SuperscriptBox[
+          RowBox[{"(", 
+           RowBox[{"x", "-", 
+            SubscriptBox["x", "0"]}], ")"}], "2"], "+", 
+         SuperscriptBox[
+          RowBox[{"(", 
+           RowBox[{"y", "-", 
+            SubscriptBox["y", "0"]}], ")"}], "2"]}], ")"}]}]]}]}], 
+   "\[IndentingNewLine]", 
+   RowBox[{"\[CapitalDelta]u", " ", "=", " ", 
+    RowBox[{
+     RowBox[{"(", 
+      RowBox[{
+       RowBox[{"(", 
+        RowBox[{
+         RowBox[{"-", "2"}], "+", 
+         RowBox[{"4", 
+          SuperscriptBox[
+           RowBox[{"(", 
+            RowBox[{"x", "-", 
+             SubscriptBox["x", "0"]}], ")"}], "2"]}]}], ")"}], "+", 
+       RowBox[{"(", 
+        RowBox[{
+         RowBox[{"-", "2"}], "+", 
+         RowBox[{"4", 
+          SuperscriptBox[
+           RowBox[{"(", 
+            RowBox[{"y", "-", 
+             SubscriptBox["y", "0"]}], ")"}], "2"]}]}], ")"}]}], ")"}], 
+     SuperscriptBox["\[ExponentialE]", 
+      RowBox[{"-", 
+       RowBox[{"(", 
+        RowBox[{
+         SuperscriptBox[
+          RowBox[{"(", 
+           RowBox[{"x", "-", 
+            SubscriptBox["x", "0"]}], ")"}], "2"], "+", 
+         SuperscriptBox[
+          RowBox[{"(", 
+           RowBox[{"y", "-", 
+            SubscriptBox["y", "0"]}], ")"}], "2"]}], ")"}]}]]}]}], 
+   "\[IndentingNewLine]", "\[IndentingNewLine]", 
+   RowBox[{"(*", "test03", "*)"}]}]}]], "Input",
+ CellChangeTimes->{{3.771677947847419*^9, 3.7716782459625664`*^9}, {
+  3.771680455624895*^9, 3.771680472627519*^9}, {3.7716837033162117`*^9, 
+  3.77168378195475*^9}, {3.771683824543324*^9, 
+  3.771683997565199*^9}},ExpressionUUID->"d155ca40-4b24-4e96-b58a-\
+195fd40b7092"]
+},
+WindowSize->{1280, 637},
+WindowMargins->{{-8, Automatic}, {Automatic, -8}},
+FrontEndVersion->"11.3 for Microsoft Windows (64-bit) (March 6, 2018)",
+StyleDefinitions->"Default.nb"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[558, 20, 6548, 213, 614, "Input",ExpressionUUID->"d155ca40-4b24-4e96-b58a-195fd40b7092"]
+}
+]
+*)
+

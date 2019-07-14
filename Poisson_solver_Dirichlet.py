@@ -13,12 +13,7 @@ from matplotlib import cm
 import Poisson_solver as ps
 import poisson_helper_functions as hf
 
-def initialize(jump,N_grid_val = 101, beta_p_val = 10000):
-    
-    #offset center
-    x0 = 0.0
-    y0 = 0.0
-    
+def setup_grid(N_grid_val = 101):
     # grid dimension
     grid_min = -1.
     grid_max = 1.
@@ -37,13 +32,18 @@ def initialize(jump,N_grid_val = 101, beta_p_val = 10000):
     # solution
     global u_init
     u_init = np.zeros_like(xmesh)
+
+def setup_equations(bnd_type_, beta_p_val = 10000):
+    
+    #offset center
+    x0 = 0.6
+    y0 = -0.2
     
     #Poisson equation coefficients
     global beta_p
     beta_p = beta_p_val
     global beta_m
     beta_m = 1.
-    
     
     #rhs solution
     global r0
@@ -61,6 +61,11 @@ def initialize(jump,N_grid_val = 101, beta_p_val = 10000):
     global lvl_func
     lvl_func = level
     
+    global bnd_type
+    bnd_type = bnd_type_
+    
+    ##below is for testing existing function purposes
+    ######################################################################
     def desired_func(x, y):
         return (1 - 0.25 * ((x - x0)**2 + (y - y0)**2))
     
@@ -70,60 +75,66 @@ def initialize(jump,N_grid_val = 101, beta_p_val = 10000):
     global sol_func
     sol_func = solution
     
+    
+    
     ##boundary conditions / jump conditions
-    def jump_condition(x,y,u_or_un):
-#        ##Dirichlet boundary
-#        #    a_jump = a+ - a-
-#        a_mesh = - desired_func(x,y)
-#        
-#        ##Neuman boundary
-#        #    b_jump = beta+ * u_n+ - beta- * u_n-
-#        b_mesh = beta_m * (-0.5) * (XYtoR((x - x0),(y - y0)))
-#        return (a_mesh, b_mesh)
-        ##Robin boundary
+    def jump_condition(x,y,u):
+        u_desired = desired_func(x,y)
+        u_n_desired = beta_m * hf.norm_grad(u_desired,(x,y),lvl_func)
+        #for Robin boundary condition only
+        def sigma(x,y):
+            return -0.25 * (hf.XYtoR(x-x0, y-y0)+10**-17)
         
-        def m(x,y):
-            return np.ones_like(x)
+        sigma_Robin = sigma(x, y)
+        g_Robin = u_desired + sigma_Robin * u_n_desired
+        #################################
         
-        def n(x,y):
-            return -0.25 * (hf.XYtoR(x-x0, y-y0)+10**-17)/beta_m
+        if(bnd_type == "Dirichlet"):
+            a_mesh = - u_desired
+            b_mesh = - beta_m * hf.grad_frame(u,(x,y),lvl_func)
+            
+        elif(bnd_type == "Neumann"):
+            a_mesh = - u
+            b_mesh = - beta_m * u_n_desired
         
-        def g(x,y):
-            return np.ones_like(x)
-        
-        def get_u_from_un(u_n,x,y):
-            return (g(x,y) - n(x,y)*u_n)/m(x,y)
-        
-        def get_un_from_u(u,x,y):
-            return (g(x,y) - m(x,y)*u)/n(x,y)
-        
-        if(jump == "u_n"):
-            a_mesh = -get_u_from_un(u_or_un,x,y)
-            b_mesh = -beta_m * u_or_un
-        elif (jump == "u"):
-            b_mesh = -get_un_from_u(u_or_un,x,y)
-            a_mesh = -u_or_un
+        elif(bnd_type == "Robin_u"):
+            a_mesh = - u
+            b_mesh = - beta_m * (g_Robin - u)/sigma_Robin
+            
+        elif(bnd_type == "Robin_u_n"):
+            a_mesh = -(g_Robin - sigma_Robin*u_n_desired)
+            b_mesh = - beta_m * hf.grad_frame(u,(x,y),lvl_func)
+            
+        elif(bnd_type == "exact"):
+            a_mesh = - u_desired
+            b_mesh = - beta_m * u_n_desired
         else:
-            print("error!!")
+            raise Exception("error: invalid boundary format")
         return (a_mesh, b_mesh)
 
     global jmp_func
     jmp_func = jump_condition
+    ######################################################################
     
 if(__name__ == "__main__"):
     ##generate poisson solver
     plt.close("all")
-    
-    for i in range(1):
-        initialize("u_n")
-        u_cur_result = u_init
+    setup_grid(101)
+    u_cur_result = u_init
+    for i in range(10):
+        setup_equations("Dirichlet")
         u_result = ps.poisson_jacobi_solver(u_cur_result, 200000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
         u_n_result = hf.grad_frame(u_result, (xmesh, ymesh), lvl_func)
 #        plt.matshow(u_n_result)
 #        plt.colorbar()
         fig_label = i
-        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[False,True,True,True])
+        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[False,False,False,True])
+        hf.print_error(u_result, (xmesh, ymesh), sol_func)
         u_cur_result = u_result
+        u_n_result = hf.grad_frame(u_result,(xmesh,ymesh),lvl_func)
+        u_n_anal = hf.grad_frame(sol_func(xmesh, ymesh),(xmesh,ymesh),lvl_func)
+        plt.matshow(u_n_result - u_n_anal)
+        print(hf.L_n_norm(np.abs(u_n_result - u_n_anal),2))
 #    initialize()
 #    u_result2 = poisson_jacobi_solver(u_result1, 100000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
 #    u_n_result2 = grad_frame(u_result2, (xmesh, ymesh), lvl_func)
