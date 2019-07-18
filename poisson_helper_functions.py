@@ -16,17 +16,17 @@ def XYtoR(x,y):
 def grad(f,dx,dy):
 #    ret_x = np.zeros_like(f)
 #    ret_y = np.zeros_like(f)
-#    ret_y[1:-1,:] = (f[2:,:  ] - f[:-2, :])/(2*dx)
-#    ret_x[:,1:-1] = (f[:  ,2:] - f[: ,:-2])/(2*dy)
-#    ret_y[0 ,:] = (f[ 1,:] - 0)/dx
-#    ret_y[-1,:] = (0 - f[-1,:])/dx
-#    ret_x[: , 0] = (f[ :,1] - 0)/dy
-#    ret_x[: ,-1] = (0 - f[:,-1])/dy
-    ret_x, ret_y = np.gradient(f,dx,dy)
+#    ret_y[1:-1, :] = (f[:-2, :] - f[ 2:, :])/(2*dx)
+#    ret_x[ :,1:-1] = (f[ :,:-2] - f[ :, 2:])/(2*dy)
+#    ret_y[0 , :] = (f[ 1, :] - f[ 0, :])/dx
+#    ret_y[-1, :] = (f[-1, :] - f[-2, :])/dx
+#    ret_x[ :, 0] = (f[ :, 1] - f[ :, 0])/dy
+#    ret_x[ :,-1] = (f[ :,-1] - f[ :,-2])/dy
+    ret_y, ret_x = np.gradient(f,dx,dy)
     return ret_x, ret_y
 
 def abs_grad(f,dx,dy):
-    grad_x, grad_y = np.gradient(f,dx,dy)
+    grad_y, grad_x = np.gradient(f,dx,dy)
     return np.sqrt(grad_x**2 + grad_y**2)
 
 #def laplacian(f,dx,dy):
@@ -120,6 +120,28 @@ def grad_frame(u_, mesh_, lvl_func_):
     u_n = u_nx * n1_norm + u_ny * n2_norm
     
     return u_n * (1-isOut)
+
+def ax_symmetry(u):
+    x_sym, y_sym = False, False
+    if(np.mean(np.abs(u - np.fliplr(u))) <= 1.0e-10 * np.mean(np.abs(u))):
+        x_sym = True
+    if(np.mean(np.abs(u - np.flipud(u))) <= 1.0e-10 * np.mean(np.abs(u))):
+        y_sym = True
+    return (x_sym, y_sym)
+
+def anti_ax_symmetry(u):
+    x_asym, y_asym = False, False
+    if(np.mean(np.abs(u + np.fliplr(u))) <= 1.0e-10 * np.mean(np.abs(u))):
+        x_asym = True
+    if(np.mean(np.abs(u + np.flipud(u))) <= 1.0e-10 * np.mean(np.abs(u))):
+        y_asym = True
+    return (x_asym, y_asym)
+
+def Hermitian(u):
+    Hermitian = False
+    if(np.mean(np.abs(u - np.transpose(u))) <= 1.0e-10 * np.mean(np.abs(u))):
+        Hermitian = True
+    return Hermitian
 
 def print_error(u_result_, mesh_, sol_func_):
     xmesh,ymesh = mesh_
