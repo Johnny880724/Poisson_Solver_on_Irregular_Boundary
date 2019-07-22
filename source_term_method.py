@@ -18,9 +18,12 @@ import sys
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from numpy import linalg as la
+import matplotlib.animation as animation
+
+
 
 #adding to denominator to avoid 0/0 error
-singular_null = 1.0e-17
+singular_null = 1.0e-30
 
 def setup_grid(N_grid_val = 101):
     # grid dimension
@@ -88,11 +91,14 @@ def H(phi_inv,h):
 #    I_mat = I(phi)
     J_mat = J(phi_inv)
     K_mat = K(phi_inv)
-    first_term = hf.laplace(J_mat,h,h) / (hf.abs_grad(phi_inv,h,h)**2 + singular_null)
-    first_term -= (hf.laplace(K_mat,h,h) - J_mat*hf.laplace(phi_inv,h,h))*hf.laplace(phi_inv,h,h) / (hf.abs_grad(phi_inv,h,h)**4 + singular_null)
+    first_term_1 = hf.laplace(J_mat,h,h) / (hf.abs_grad(phi_inv,h,h)**2 + singular_null)
+    first_term_2 = -(hf.laplace(K_mat,h,h) - J_mat*hf.laplace(phi_inv,h,h))*hf.laplace(phi_inv,h,h) / (hf.abs_grad(phi_inv,h,h)**4 + singular_null)
+    first_term = first_term_1 + first_term_2
+#    first_term -= hf.grad_dot_grad(J_mat, phi_inv,h)*hf.laplace(phi_inv,h,h) / (hf.abs_grad(phi_inv,h,h)**4 + singular_null)
     second_term = np.heaviside(phi_inv,1)
+#    return np.heaviside(phi_inv,1)
     return Chi(phi_inv) * first_term + (1-Chi(phi_inv)) * second_term
-
+#
 def delta(phi_inv,h):
     I_mat = I(phi_inv)
     J_mat = J(phi_inv)
@@ -101,6 +107,16 @@ def delta(phi_inv,h):
     first_term -= (hf.laplace(J_mat,h,h) - I_mat*hf.laplace(phi_inv,h,h))*hf.laplace(phi_inv,h,h) / (hf.abs_grad(phi_inv,h,h)**4 + singular_null)
     return Chi(phi_inv) * first_term
 
+def H_delta_test():
+    setup_grid(101)
+    setup_equations("exact")
+    phi = lvl_func(xmesh, ymesh)
+    plt.matshow(H(-phi,h))
+    fig_dif = plt.figure()
+    ax_dif = fig_dif.gca(projection='3d')
+    ax_dif.plot_surface(xmesh, ymesh, H(-phi,h), cmap=cm.coolwarm)
+#test2=H_delta_test()
+    
 def get_source(a, b, mesh, lvl_func_,f_mat_):
     xmesh, ymesh = mesh
     h = xmesh[0,1]-xmesh[0,0]
@@ -108,23 +124,41 @@ def get_source(a, b, mesh, lvl_func_,f_mat_):
     #in the soruce term paper, the phi they use are inverted
     phi_inv = -phi
     
-    #Discretization of the source term - formula (8)
-    a_eff = a + (hf.norm_grad(a,(xmesh,ymesh),lvl_func_) - b) * phi_inv / (hf.abs_grad(phi_inv,h,h)+singular_null)
+    #Discretization of the source term - formula (prev paper)
     S_mat = np.zeros_like(xmesh)
-    H_mat = H(phi_inv,h)
-    S_mat = hf.laplace(a_eff * H_mat,h,h) - H_mat * hf.laplace(a_eff,h,h) + H_mat * f_mat_
+    H_h_mat = H(phi_inv,h)
+    H_mat = np.heaviside(phi_inv,1)
+    delta_mat = delta(phi_inv,h)
+    S_mat = a*hf.laplace(H_mat,h,h) - (hf.norm_grad(a,(xmesh,ymesh),lvl_func_) + b)*delta_mat*hf.abs_grad(phi_inv,h,h) + H_h_mat * f_mat_
     
+    #Discretization of the source term - formula (8)
+#    a_eff = (a + (hf.norm_grad(a,(xmesh,ymesh),lvl_func_) - b) * phi_inv / (hf.abs_grad(phi_inv,h,h)+singular_null))
+#    H_h_mat = H(phi_inv,h)
+#    H_mat = np.heaviside(phi_inv,1)
+#    S_mat = hf.laplace(a_eff * H_mat,h,h) - H_h_mat * hf.laplace(a_eff,h,h) + H_h_mat * f_mat_
     #Discretization of the source term - formula (7)
-#    S_mat = np.zeros_like(xmesh)
-#    H_mat = H(phi_inv,h)
+#    H_h_mat = H(phi_inv,h)
+#    H_mat = np.heaviside(phi_inv,1)
 #    term1 = hf.laplace(a * H_mat,h,h)
-#    term2 = - H_mat * hf.laplace(a, h, h)
+#    term2 = - H_h_mat * hf.laplace(a, h, h)
 #    term3 = - (b - hf.norm_grad(a,(xmesh,ymesh),lvl_func_)) * delta(phi_inv, h) * hf.abs_grad(phi_inv,h,h)
-#    term4 = H_mat * f_mat_
+#    term4 = H_h_mat * f_mat_
 #    S_mat = term1 + term2 + term3 + term4
     
     return S_mat
 
+def source_test():
+    setup_grid(101)
+    setup_equations("exact")
+    phi = lvl_func(xmesh, ymesh)
+    a_mesh = desired_func(xmesh,ymesh)
+    b_mesh = hf.norm_grad(a_mesh, (xmesh,ymesh),lvl_func)
+    source = get_source(a_mesh, b_mesh, (xmesh, ymesh), lvl_func, rhs_func(xmesh,ymesh))
+    plt.matshow(source*(1-get_N1(phi)))
+    plt.matshow((1-get_N1(phi)))
+    return H(-phi,h)
+
+#source_test()
 #projection algorithm
 def projection(mesh_, phi_inv):
     xmesh, ymesh = mesh_
@@ -197,7 +231,7 @@ def extrapolation(val_, target_, eligible_):
         
     return val_extpl
 
-def setup_equations(bnd_type_, beta_p_val = 1.):
+def setup_equations(beta_p_val = 1.):
     
     #offset center
     x0 = 0.0
@@ -226,8 +260,6 @@ def setup_equations(bnd_type_, beta_p_val = 1.):
     global lvl_func
     lvl_func = level
     
-    global bnd_type
-    bnd_type = bnd_type_
     
     ##below is for testing existing function purposes
     ######################################################################
@@ -243,45 +275,48 @@ def setup_equations(bnd_type_, beta_p_val = 1.):
     sol_func = solution
     
     
+def setup_equations_2(beta_p_val = 1.):
+    A = 0.5 * np.pi
+    B = 0.75 * np.pi
+    alpha = 4
+    beta = 1.25
+    def rhs(x,y):
+#        return -np.zeros_like(x)
+        return -(A**2 + B**2) * np.sin(A*x) * np.cos(B*y)
     
-    ##boundary conditions / jump conditions
-    def jump_condition(x,y,u):
-        u_desired = desired_func(x,y)
-        u_n_desired = hf.norm_grad(u_desired,(x,y),lvl_func)
-        #for Robin boundary condition only
-        def sigma(x,y):
-            return -0.25 * (hf.XYtoR(x-x0, y-y0)+10**-17)
-        
-        sigma_Robin = sigma(x, y)
-        g_Robin = u_desired + sigma_Robin * u_n_desired
-        #################################
-        
-        if(bnd_type == "Dirichlet"):
-            a_mesh =  u_desired
-            b_mesh =  beta_m * hf.grad_frame(u,(x,y),lvl_func)
-            
-        elif(bnd_type == "Neumann"):
-            a_mesh = - u
-            b_mesh = - beta_m * u_n_desired
-        
-        elif(bnd_type == "Robin_u"):
-            a_mesh = - u
-            b_mesh = - beta_m * (g_Robin - u)/sigma_Robin
-            
-        elif(bnd_type == "Robin_u_n"):
-            a_mesh = -(g_Robin - sigma_Robin*u_n_desired)
-            b_mesh = - beta_m * hf.grad_frame(u,(x,y),lvl_func)
-            
-        elif(bnd_type == "exact"):
-            a_mesh = - u_desired
-            b_mesh = - beta_m * u_n_desired
-        else:
-            raise Exception("error: invalid boundary format")
-        return (a_mesh, b_mesh)
-
-    global jmp_func
-    jmp_func = jump_condition
+    global rhs_func
+    rhs_func = rhs
+    
+    
+    def level(x,y):
+        return -0.9 + hf.XYtoR(alpha*x, beta*y)
+    
+    global lvl_func
+    lvl_func = level
+    
+    
+    ##below is for testing existing function purposes
     ######################################################################
+    def desired_result(x, y):
+        return 1 + np.sin(A*x) * np.cos(B*y)
+    global desired_func 
+    desired_func = desired_result
+    
+    def solution(x,y):
+        sol = np.heaviside(-lvl_func(x,y),1)*(desired_func(x,y))
+        return sol
+    global sol_func
+    sol_func = solution
+    
+    def norm_der(x,y):
+        u_x = A * np.cos(A*x) * np.cos(B*y)
+        u_y = - B * np.sin(A*x) * np.sin(B*y)
+        n_x = alpha**2 * x / (hf.XYtoR(alpha*x, beta*y)+singular_null)
+        n_y = beta**2 * y / (hf.XYtoR(alpha*x, beta*y)+singular_null)
+        u_n = (u_x * n_x + u_y * n_y) / (hf.XYtoR(n_x,n_y)+singular_null)
+        return u_n
+    global desired_func_n
+    desired_func_n = norm_der
     
 def test_projection():
 #    phi = hf.XYtoR(xmesh, ymesh) - r0
@@ -371,94 +406,186 @@ def test_symmetry(mat, mat_str):
     print( mat_str + " is anti-symmetric : ",hf.anti_ax_symmetry(mat))
     print( mat_str + " is Hermitian : ",hf.Hermitian(mat))
 
-def poisson_jacobi_source_term_Dirichlet(u_init_, maxIterNum_, mesh_,lvl_func_,f_mesh_, g_mesh_):
+def poisson_jacobi_source_term_Dirichlet(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_func_, desired_func_, iteration_total):
     xmesh, ymesh = mesh_
     h = xmesh[0,1] - xmesh[0,0]
     phi = lvl_func_(xmesh, ymesh)
+    phi_inv = -phi
     grad_result = hf.grad(phi, h, h)
     nx = grad_result[0] / (np.sqrt(grad_result[0]**2 + grad_result[1]**2) + singular_null)
     ny = grad_result[1] / (np.sqrt(grad_result[0]**2 + grad_result[1]**2) + singular_null)
     
-    #A4 compute u_x, u_y for Omega^- ^ N4 \ N1
-    ux, uy = hf.grad(u_init_, h, h)
-    
-    #A5 Extrapolate u_x, u_y throughout N2
     N1 = get_N1(phi)
     N2 = get_N2(phi)
     Omega_m = np.heaviside(-phi, 1)
-    eligible_0 = Omega_m * (1-N2)
-    target_0 = N2 * (1-eligible_0)
-    ux_extpl = extrapolation(ux, target_0, eligible_0)
-    uy_extpl = extrapolation(uy, target_0, eligible_0)
-#    test_symmetry(ux_extpl,"ux")
+    isOut = np.greater(phi,0)
     
-    #A6 compute the new a throughout N2
-    a_mesh = - np.copy(g_mesh_)
-    b_mesh = - (ux_extpl * nx + uy_extpl * ny)
-#    test_symmetry(a_mesh, "a_mesh")
-#    test_symmetry(b_mesh, "b_mesh")
-#    plt.matshow(f_mesh_)
-#    plt.colorbar()
-    #A1 compute the source term
-    source = get_source(-a_mesh, -b_mesh, (xmesh, ymesh), lvl_func_, f_mesh_)
-#    test_symmetry(source,"source")
-#    test_symmetry(source, "source")
-    
-    #A2 compute the source term with the addition of convergence term
-    q = 0.75
-    source += (q / h * u_init_) * (1-Omega_m) * N2
-    
-    #A3 call a Poisson solver resulting in u throughout Omega
-    u_init = np.zeros_like(xmesh)
-    u_result = poisson_jacobi_solver(u_init, 200000, (xmesh,ymesh), source)
-    return u_result
-
-if(__name__ == "__main__"):
-    plt.close("all")
-    
-    setup_grid(65)
-    setup_equations("Dirichlet")
-    
-    
-    phi = lvl_func(xmesh, ymesh)
-    phi_inv = -phi
-    
-    #1. Extend g(x,y) off of Gamma, define a, b throughout N2
+    #1. Extend g(x,y) off of Gamma, define a throughout N2
 #    xmesh_p = xmesh
 #    ymesh_p = ymesh
     xmesh_p, ymesh_p = projection((xmesh,ymesh),phi_inv)
-    g_ext = desired_func(xmesh_p, ymesh_p)
-#    plt.matshow(g_ext)
-#    print("is", hf.ax_symmetry(g_ext))
+    g_ext = desired_func_(xmesh_p, ymesh_p)
+    plt.matshow(g_ext * N2)
+    a_mesh = -g_ext * N2
     
     #2. extrapolate f throughout N1 U Omega^+
-    f_org = rhs_func(xmesh, ymesh)
-    phi_inv = -phi
-    N1 = get_N1(phi)
-    Omega_m = np.heaviside(-phi, 1)
-#    eligible_0 = Omega_m * (1-N1)
-    eligible_0 = Omega_m
+    f_org = rhs_func_(xmesh, ymesh)
+    eligible_0 = Omega_m * (1-N1)
     target_0 = N1 * (1 - eligible_0)
     f_extpl = extrapolation(f_org, target_0, eligible_0)
 #    plt.matshow(f_extpl)
 #    print("is", hf.ax_symmetry(f_extpl))
     
     #3. initialize b = 0 throughout N2
-    u_cur_result = np.copy(u_init)
+    b_mesh = np.zeros_like(u_init_)
+    u_cur_result = np.copy(u_init_)
     
+    def sol_func(x,y):
+        return desired_func_(x,y) * (1-isOut)
+    sol = sol_func
     
-    isOut = 1 - np.greater(phi,0)
-    for i in range(10):
-        u_result = poisson_jacobi_source_term_Dirichlet(u_cur_result, 200000, (xmesh,ymesh), lvl_func,f_extpl, g_ext)
+    for it in range(iteration_total):
+        #A1 compute the source term
+        source = get_source(-a_mesh, -b_mesh, (xmesh, ymesh), lvl_func_, f_extpl)
+#        plt.matshow(source)
+        
+        #A2 compute the source term with the addition of convergence term
+        if(it > 0):
+            q = 0.75
+            source += (q / h * u_cur_result) * (1-Omega_m) * N2
+            
+        #A3 call a Poisson solver resulting in u throughout Omega
+        u_result = poisson_jacobi_solver(u_init_, 400000, (xmesh,ymesh), source)
         u_cur_result = np.copy(u_result)
-        hf.print_error(u_result*isOut, (xmesh,ymesh),sol_func)
-#        print(hf.ax_symmetry(u_result))
-#        print(hf.Hermitian(u_result))
-#    hf.print_error(u_result, (xmesh,ymesh),sol_func)
-    plt.matshow(u_result)
-    hf.plot3d_all(u_result, (xmesh,ymesh),sol_func,0)
+        
+        
+        #A4 compute u_x, u_y for Omega^- ^ N4 \ N1
+        ux, uy = hf.grad(u_result, h, h)
+        
+        #A5 Extrapolate u_x, u_y throughout N2
+        eligible_0 = Omega_m * (1-N1)
+        target_0 = N1 * (1-eligible_0)
+        ux_extpl = extrapolation(ux, target_0, eligible_0)
+        uy_extpl = extrapolation(uy, target_0, eligible_0)
+    #    test_symmetry(ux_extpl,"ux")
+        
+        #A6 compute the new a throughout N2
+        b_mesh = - (ux_extpl * nx + uy_extpl * ny)
+#        plt.matshow(b_mesh)
+        if(it %  1 == 0):
+            hf.plot3d_all(u_result*(1-isOut), (xmesh,ymesh),sol,it,[False,False,False,True])
+        hf.print_error(u_result*(1-isOut), (xmesh,ymesh),sol)
+#        plt.matshow(sol(xmesh,ymesh))
+#        plt.matshow(u_result)
+        
+    
+    return u_result
+
+def poisson_jacobi_source_term_Neumann(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_func_,desired_func_, desired_func_n_, iteration_total):
+    xmesh, ymesh = mesh_
+    h = xmesh[0,1] - xmesh[0,0]
+    phi = lvl_func_(xmesh, ymesh)
+    phi_inv = -phi
+    grad_result = hf.grad(phi, h, h)
+    
+    N1 = get_N1(phi)
+    N2 = get_N2(phi)
+    Omega_m = np.heaviside(-phi, 1)
+    isOut = np.greater(phi,0)
+    
+    #1. Extend g(x,y) off of Gamma, define b throughout N2
+#    xmesh_p = xmesh
+#    ymesh_p = ymesh
+    xmesh_p, ymesh_p = projection((xmesh,ymesh),phi_inv)
+    g_ext = desired_func_n_(xmesh_p, ymesh_p)
+    plt.matshow(g_ext*N2)
+    b_mesh = -g_ext * N2
+    
+    #2. extrapolate f throughout N1 U Omega^+
+    f_org = rhs_func_(xmesh, ymesh)
+    eligible_0 = Omega_m * (1-N1)
+    target_0 = N1 * (1 - eligible_0)
+    f_extpl = extrapolation(f_org, target_0, eligible_0)
+#    plt.matshow(f_extpl)
+#    print("is", hf.ax_symmetry(f_extpl))
+    
+    #3. initialize a = 0 throughout N2
+    a_mesh = - u_init_
+    u_cur_result = np.copy(u_init_)
+    
+    def sol_func(x,y):
+        return desired_func_(x,y) * (1-isOut)
+    sol = sol_func
+    
+    fig = plt.figure()
+    ax = fig.gca(projection = '3d')
+    ax.set_zlim3d(0, 1.0)
+    plots = []
+    for it in range(iteration_total):
+        #A1 compute the source term
+        source = get_source(-a_mesh, -b_mesh, (xmesh, ymesh), lvl_func_, f_extpl)
+#        plt.matshow(source)
+        
+        #A2 compute the source term with the addition of convergence term
+#        q = -0.75 * min(1,it*0.1)
+#        source += (q / h * u_cur_result) * (1-Omega_m) * N2
+            
+        #A3 call a Poisson solver resulting in u throughout Omega
+        u_result = poisson_jacobi_solver(u_init_, 400000, (xmesh,ymesh), source)
+        u_result = u_result * (1-isOut)
+#        plt.matshow(u_result - u_cur_result)
+    
+        #A4 Extrapolate u throughout N2
+        eligible_0 = Omega_m * (1-N1)
+        target_0 = N2 * (1-eligible_0)
+        u_extpl = extrapolation(u_result, target_0, eligible_0)
+    #    test_symmetry(ux_extpl,"ux")
+        
+        #A5 compute the new a throughout N2
+#        plt.matshow(-u_extpl - a_mesh)
+        
+        a_mesh = - np.copy(u_extpl)
+        
+        
+        u_cur_result = np.copy(u_result)
+        
+        #ploting iterations
+#        if(it %  10 == 0):
+#            hf.plot3d_all(u_result*(1-isOut), (xmesh,ymesh),sol,it,[False,False,False,True])
+        
+        
+        dif = (u_result-sol(xmesh,ymesh))*(1-isOut)
+        error = (dif - np.sum(dif) / np.sum((1-isOut)))*(1-isOut)
+        print(np.max(np.abs(error)))
+#        fig = plt.figure()
+#        ax = fig.gca(projection='3d')
+#        ax.plot_surface(xmesh,ymesh,error)
+#        plt.matshow(sol(xmesh,ymesh))
+#        plt.matshow(u_result)
+        plot = ax.plot_surface(xmesh,ymesh,u_result, animated=True, cmap=cm.coolwarm)
+        plots.append([plot])
+    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,
+                                repeat_delay=0)
+    
+    return u_result,ani
+
+if(__name__ == "__main__"):
+    plt.close("all")
+    
+    setup_grid(79)
+    setup_equations_2()
+    fig_an = plt.figure()
+    ax_an = fig_an.gca(projection = '3d')
+    phi = lvl_func(xmesh,ymesh)
+    N2 = get_N2(phi)
+    
+#    plt.matshow(hf.norm_grad(desired_func(xmesh,ymesh),(xmesh,ymesh),lvl_func))
+#    plt.matshow(u_n_func(xmesh,ymesh))
+#    plt.matshow(desired_func(xmesh,ymesh)*N2)
+    plot = ax_an.plot_surface(xmesh,ymesh,sol_func(xmesh,ymesh), cmap=cm.coolwarm)
+    
+    u_result,ani = poisson_jacobi_source_term_Neumann(u_init + 10*xmesh**5 + 20*ymesh**10, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func, desired_func_n, 20)
+    plt.show()
+    
     
 
-def test(x,y):
-    return x**2 + y**2
-atest, btest = hf.grad(test(xmesh, ymesh), h, h)

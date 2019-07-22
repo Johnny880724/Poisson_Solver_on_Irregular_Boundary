@@ -51,6 +51,11 @@ def norm_grad(u_, mesh_, lvl_func_):
     
     return u_n
 
+def grad_dot_grad(a_mat, b_mat, h):
+    ax,ay = grad(a_mat,h,h)
+    bx,by = grad(b_mat,h,h)
+    return ax*bx + ay*by
+
 def div(fx,fy,dx,dy):
     ret_x = np.zeros_like(fx)
     ret_y = np.zeros_like(fy)
@@ -153,13 +158,28 @@ def print_error(u_result_, mesh_, sol_func_):
     print("L2 error: ", L2Dif)
     return maxDif, L2Dif
 
+def print_error_Neumann(u_result_, mesh_, sol_func_):
+    xmesh,ymesh = mesh_
+    dif = np.abs(u_result_ - sol_func_(xmesh,ymesh))
+    error = dif - np.mean(dif)
+#    print(dif)
+    L2Dif = L_n_norm(error,2)
+    maxDif = np.max(error)
+    print("maximum error: ", maxDif)
+    print("L2 error: ", L2Dif)
+    plt.matshow(error)
+    return maxDif, L2Dif
+
 def plot3d_all(u_result_, mesh_, sol_func_,fig_label_, toPlot_ = [True, True, True, True]):
     xmesh, ymesh = mesh_
     sol_mesh = sol_func_(xmesh, ymesh)
     if(toPlot_[0]):
         #2D color plot of the max difference
-        fig_er = plt.figure("poisson solution error %d" % fig_label_)
-        plt.pcolor(xmesh, ymesh, (sol_mesh - u_result_)/(sol_mesh+1.0e-17))
+#        fig_er = plt.figure("poisson solution error %d" % fig_label_)
+#        plt.pcolor(xmesh, ymesh, (sol_mesh - u_result_)/(sol_mesh+1.0e-17))
+        test_mat = (sol_mesh - u_result_)/(sol_mesh+1.0e-17)
+        
+        plt.matshow(test_mat )
         plt.colorbar()
 #        fig_dif.savefig("max_dif_%d.png" % iterNum)
     
