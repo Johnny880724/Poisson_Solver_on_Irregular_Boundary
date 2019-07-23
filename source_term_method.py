@@ -274,7 +274,7 @@ def setup_equations(beta_p_val = 1.):
     global sol_func
     sol_func = solution
     
-    
+#No 1, 5 in the source term paper
 def setup_equations_2(beta_p_val = 1.):
     A = 0.5 * np.pi
     B = 0.75 * np.pi
@@ -313,6 +313,61 @@ def setup_equations_2(beta_p_val = 1.):
         u_y = - B * np.sin(A*x) * np.sin(B*y)
         n_x = alpha**2 * x / (hf.XYtoR(alpha*x, beta*y)+singular_null)
         n_y = beta**2 * y / (hf.XYtoR(alpha*x, beta*y)+singular_null)
+        u_n = (u_x * n_x + u_y * n_y) / (hf.XYtoR(n_x,n_y)+singular_null)
+        return u_n
+    global desired_func_n
+    desired_func_n = norm_der
+    
+#No 2, 6, 9
+def setup_equations_3(beta_p_val = 1.):
+    A = 2.7
+    B = 3.1
+    
+    #level function
+    coef = 0.1
+    const = 0.5
+    theta_coef = 4.
+    theta_const = 0.17 * np.pi
+    beta = 1.
+    def rhs(x,y):
+#        return -np.zeros_like(x)
+        return -(A**2 + B**2) * np.sin(A*x) * np.cos(B*y)
+    
+    global rhs_func
+    rhs_func = rhs
+    
+    
+    def level(x,y):
+        theta = np.arctan(y/x)
+        r = hf.XYtoR(x, y)
+        return -(const + coef * np.sin(theta_coef*theta + theta_const) - r)
+    
+    global lvl_func
+    lvl_func = level
+    
+    
+    ##below is for testing existing function purposes
+    ######################################################################
+    def desired_result(x, y):
+        return 1 + np.sin(A*x) * np.cos(B*y)
+    global desired_func 
+    desired_func = desired_result
+    
+    def solution(x,y):
+        sol = np.heaviside(-lvl_func(x,y),1)*(desired_func(x,y))
+        return sol
+    global sol_func
+    sol_func = solution
+    
+    def norm_der(x,y):
+        theta = np.arctan(y/x)
+        r = hf.XYtoR(x, y)
+        u_x = A * np.cos(A*x) * np.cos(B*y)
+        u_y = - B * np.sin(A*x) * np.sin(B*y)
+        dphi_dr = 1.
+        dphi_dtheta = -coef * theta_coef * np.cos(theta_coef*theta + theta_const)
+        n_x = np.cos(theta) * dphi_dr - np.sin(theta) * dphi_dtheta
+        n_y = np.sin(theta) * dphi_dr + np.cos(theta) * dphi_dtheta
         u_n = (u_x * n_x + u_y * n_y) / (hf.XYtoR(n_x,n_y)+singular_null)
         return u_n
     global desired_func_n
@@ -517,18 +572,20 @@ def poisson_jacobi_source_term_Neumann(u_init_, maxIterNum_, mesh_,lvl_func_,rhs
         return desired_func_(x,y) * (1-isOut)
     sol = sol_func
     
+    #animation
     fig = plt.figure()
     ax = fig.gca(projection = '3d')
     ax.set_zlim3d(0, 1.0)
     plots = []
+    
     for it in range(iteration_total):
         #A1 compute the source term
         source = get_source(-a_mesh, -b_mesh, (xmesh, ymesh), lvl_func_, f_extpl)
 #        plt.matshow(source)
         
         #A2 compute the source term with the addition of convergence term
-#        q = -0.75 * min(1,it*0.1)
-#        source += (q / h * u_cur_result) * (1-Omega_m) * N2
+        q = -0.75 * min(1,it*0.1)
+        source += (q / h * u_cur_result) * (1-Omega_m) * N2
             
         #A3 call a Poisson solver resulting in u throughout Omega
         u_result = poisson_jacobi_solver(u_init_, 400000, (xmesh,ymesh), source)
@@ -554,25 +611,99 @@ def poisson_jacobi_source_term_Neumann(u_init_, maxIterNum_, mesh_,lvl_func_,rhs
 #            hf.plot3d_all(u_result*(1-isOut), (xmesh,ymesh),sol,it,[False,False,False,True])
         
         
-        dif = (u_result-sol(xmesh,ymesh))*(1-isOut)
-        error = (dif - np.sum(dif) / np.sum((1-isOut)))*(1-isOut)
-        print(np.max(np.abs(error)))
+#        dif = (u_result-sol(xmesh,ymesh))*(1-isOut)
+#        error = (dif - np.sum(dif) / np.sum((1-isOut)))*(1-isOut)
+#        print(np.max(np.abs(error)))
 #        fig = plt.figure()
 #        ax = fig.gca(projection='3d')
 #        ax.plot_surface(xmesh,ymesh,error)
 #        plt.matshow(sol(xmesh,ymesh))
 #        plt.matshow(u_result)
-        plot = ax.plot_surface(xmesh,ymesh,u_result, animated=True, cmap=cm.coolwarm)
-        plots.append([plot])
-    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,
-                                repeat_delay=0)
+        hf.print_error((u_result+1.0)*(1-isOut),(xmesh,ymesh),sol)
+#        plt.matshow((u_result + 1.0 - sol(xmesh,ymesh))*(1-isOut))
+        fig1 = plt.figure(str(it))
+        ax = fig1.gca(projection='3d')
+        ax.plot_surface(xmesh,ymesh,(u_result+1.0 - sol(xmesh,ymesh))*(1-isOut), cmap=cm.coolwarm)
+        
+        #animation
+#        plot = ax.plot_surface(xmesh,ymesh,u_result+1.0, animated=True, cmap=cm.coolwarm)
+#        plots.append([plot])
+#    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,
+#                                repeat_delay=0)
+    return u_result,ani
+
+def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_func_,desired_func_, desired_func_n_,sigma_func_, iteration_total):
+    xmesh, ymesh = mesh_
+    h = xmesh[0,1] - xmesh[0,0]
+    phi = lvl_func_(xmesh, ymesh)
+    phi_inv = -phi
+    grad_result = hf.grad(phi, h, h)
     
+    N1 = get_N1(phi)
+    N2 = get_N2(phi)
+    Omega_m = np.heaviside(-phi, 1)
+    isOut = np.greater(phi,0)
+    #1. Extend g(x,y) off of Gamma, define b throughout N2
+    #    xmesh_p = xmesh
+    #    ymesh_p = ymesh
+    xmesh_p, ymesh_p = projection((xmesh,ymesh),phi_inv)
+    sigma_mesh = sigma_func(xmesh_p, ymesh_p)
+    
+    #2. Extend g(x,y) off of Gamma, define b throughout N2
+    g_ext = desired_func_n_(xmesh_p, ymesh_p)
+    plt.matshow(g_ext*N2)
+    g_mesh = g_ext * N2
+    
+    #3. extrapolate f throughout N1 U Omega^+
+    f_org = rhs_func_(xmesh, ymesh)
+    eligible_0 = Omega_m * (1-N1)
+    target_0 = N1 * (1 - eligible_0)
+    f_extpl = extrapolation(f_org, target_0, eligible_0)
+#    plt.matshow(f_extpl)
+#    print("is", hf.ax_symmetry(f_extpl))
+    
+    #4. initialize a = 0 throughout N2
+    a_mesh = - u_init_
+    u_cur_result = np.copy(u_init_)
+    
+    def sol_func(x,y):
+        return desired_func_(x,y) * (1-isOut)
+    sol = sol_func
+    
+    for it in range(iteration_total):
+        #A1 compute b = g - sigma * a
+        ## u + sigma * u_n = g
+        b_mesh = - (g_mesh - a_mesh) / (sigma_mesh + singular_null)
+        
+        #A2 compute the source term
+        source = get_source(-a_mesh, -b_mesh, (xmesh, ymesh), lvl_func_, f_extpl)
+        
+        #A2-2 compute the source term with the addition of convergence term
+        q = -0.75 * min(1,it*0.1)
+        source += (q / h * u_cur_result) * (1-Omega_m) * N2
+            
+        #A3 call a Poisson solver resulting in u throughout Omega
+        u_result = poisson_jacobi_solver(u_init_, 400000, (xmesh,ymesh), source)
+        u_result = u_result * (1-isOut)
+#        plt.matshow(u_result - u_cur_result)
+    
+        #A4 Extrapolate u throughout N2
+        eligible_0 = Omega_m * (1-N1)
+        target_0 = N2 * (1-eligible_0)
+        u_extpl = extrapolation(u_result, target_0, eligible_0)
+        
+        u_cur_result = np.copy(u_result)
+        hf.print_error((u_result+1.0)*(1-isOut),(xmesh,ymesh),sol)
+        fig1 = plt.figure(str(it))
+        ax = fig1.gca()
+        ax.plot_surface(xmesh,ymesh,(u_result+1.0 - sol(xmesh,ymesh))*(1-isOut), cmap=cm.coolwarm)
+        
     return u_result,ani
 
 if(__name__ == "__main__"):
     plt.close("all")
     
-    setup_grid(79)
+    setup_grid(129)
     setup_equations_2()
     fig_an = plt.figure()
     ax_an = fig_an.gca(projection = '3d')
@@ -584,8 +715,7 @@ if(__name__ == "__main__"):
 #    plt.matshow(desired_func(xmesh,ymesh)*N2)
     plot = ax_an.plot_surface(xmesh,ymesh,sol_func(xmesh,ymesh), cmap=cm.coolwarm)
     
-    u_result,ani = poisson_jacobi_source_term_Neumann(u_init + 10*xmesh**5 + 20*ymesh**10, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func, desired_func_n, 20)
-    plt.show()
-    
+    u_result,ani = poisson_jacobi_source_term_Neumann(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func, desired_func_n,10)
+   
     
 
