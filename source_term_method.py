@@ -125,25 +125,26 @@ def get_source(a, b, mesh, lvl_func_,f_mat_):
     phi_inv = -phi
     
     #Discretization of the source term - formula (prev paper)
-    S_mat = np.zeros_like(xmesh)
-    H_h_mat = H(phi_inv,h)
-    H_mat = np.heaviside(phi_inv,1)
-    delta_mat = delta(phi_inv,h)
-    S_mat = a*hf.laplace(H_mat,h,h) - (hf.norm_grad(a,(xmesh,ymesh),lvl_func_) + b)*delta_mat*hf.abs_grad(phi_inv,h,h) + H_h_mat * f_mat_
+#    S_mat = np.zeros_like(xmesh)
+#    H_h_mat = H(phi_inv,h)
+#    H_mat = np.heaviside(phi_inv,1)
+#    delta_mat = delta(phi_inv,h)
+#    S_mat = a*hf.laplace(H_mat,h,h) - (hf.norm_grad(a,(xmesh,ymesh),lvl_func_) + b)*delta_mat*hf.abs_grad(phi_inv,h,h) + H_h_mat * f_mat_
     
     #Discretization of the source term - formula (8)
 #    a_eff = (a + (hf.norm_grad(a,(xmesh,ymesh),lvl_func_) - b) * phi_inv / (hf.abs_grad(phi_inv,h,h)+singular_null))
 #    H_h_mat = H(phi_inv,h)
 #    H_mat = np.heaviside(phi_inv,1)
 #    S_mat = hf.laplace(a_eff * H_mat,h,h) - H_h_mat * hf.laplace(a_eff,h,h) + H_h_mat * f_mat_
+    
     #Discretization of the source term - formula (7)
-#    H_h_mat = H(phi_inv,h)
-#    H_mat = np.heaviside(phi_inv,1)
-#    term1 = hf.laplace(a * H_mat,h,h)
-#    term2 = - H_h_mat * hf.laplace(a, h, h)
-#    term3 = - (b - hf.norm_grad(a,(xmesh,ymesh),lvl_func_)) * delta(phi_inv, h) * hf.abs_grad(phi_inv,h,h)
-#    term4 = H_h_mat * f_mat_
-#    S_mat = term1 + term2 + term3 + term4
+    H_h_mat = H(phi_inv,h)
+    H_mat = np.heaviside(phi_inv,1)
+    term1 = hf.laplace(a * H_mat,h,h)
+    term2 = - H_h_mat * hf.laplace(a, h, h)
+    term3 = - (b - hf.norm_grad(a,(xmesh,ymesh),lvl_func_)) * delta(phi_inv, h) * hf.abs_grad(phi_inv,h,h)
+    term4 = H_h_mat * f_mat_
+    S_mat = term1 + term2 + term3 + term4
     
     return S_mat
 
@@ -264,7 +265,7 @@ def setup_equations(beta_p_val = 1.):
     ##below is for testing existing function purposes
     ######################################################################
     def desired_result(x, y):
-        return (1 -0.25 * ((x - x0)**2 + (y - y0)**2))
+        return (1 - 0.25 * ((x - x0)**2 + (y - y0)**2))
     global desired_func 
     desired_func = desired_result
     
@@ -273,6 +274,16 @@ def setup_equations(beta_p_val = 1.):
         return sol
     global sol_func
     sol_func = solution
+    
+    def norm_der(x,y):
+        u_x = - 0.5 * (x - x0)
+        u_y = - 0.5 * (y - y0)
+        n_x = x / (hf.XYtoR(x, y)+singular_null)
+        n_y = y / (hf.XYtoR(x, y)+singular_null)
+        u_n = (u_x * n_x + u_y * n_y) / (hf.XYtoR(n_x,n_y)+singular_null)
+        return u_n
+    global desired_func_n
+    desired_func_n = norm_der
     
 #No 1, 5 in the source term paper
 def setup_equations_2(beta_p_val = 1.):
@@ -338,7 +349,7 @@ def setup_equations_3(beta_p_val = 1.):
     
     
     def level(x,y):
-        theta = np.arctan(y/x)
+        theta = np.arctan(y/(x+singular_null))
         r = hf.XYtoR(x, y)
         return -(const + coef * np.sin(theta_coef*theta + theta_const) - r)
     
@@ -360,14 +371,14 @@ def setup_equations_3(beta_p_val = 1.):
     sol_func = solution
     
     def norm_der(x,y):
-        theta = np.arctan(y/x)
+        theta = hf.XYtoTheta(x, y)
         r = hf.XYtoR(x, y)
         u_x = A * np.cos(A*x) * np.cos(B*y)
         u_y = - B * np.sin(A*x) * np.sin(B*y)
         dphi_dr = 1.
         dphi_dtheta = -coef * theta_coef * np.cos(theta_coef*theta + theta_const)
-        n_x = np.cos(theta) * dphi_dr - np.sin(theta) * dphi_dtheta
-        n_y = np.sin(theta) * dphi_dr + np.cos(theta) * dphi_dtheta
+        n_x = np.cos(theta) * dphi_dr - np.sin(theta) * dphi_dtheta / (r + singular_null)
+        n_y = np.sin(theta) * dphi_dr + np.cos(theta) * dphi_dtheta / (r + singular_null)
         u_n = (u_x * n_x + u_y * n_y) / (hf.XYtoR(n_x,n_y)+singular_null)
         return u_n
     global desired_func_n
@@ -611,25 +622,25 @@ def poisson_jacobi_source_term_Neumann(u_init_, maxIterNum_, mesh_,lvl_func_,rhs
 #            hf.plot3d_all(u_result*(1-isOut), (xmesh,ymesh),sol,it,[False,False,False,True])
         
         
-#        dif = (u_result-sol(xmesh,ymesh))*(1-isOut)
-#        error = (dif - np.sum(dif) / np.sum((1-isOut)))*(1-isOut)
-#        print(np.max(np.abs(error)))
+        dif = (u_result-sol(xmesh,ymesh))*(1-isOut)
+        error = (dif - np.sum(dif) / np.sum((1-isOut)))*(1-isOut)
+        print(np.max(np.abs(error)))
 #        fig = plt.figure()
 #        ax = fig.gca(projection='3d')
 #        ax.plot_surface(xmesh,ymesh,error)
 #        plt.matshow(sol(xmesh,ymesh))
 #        plt.matshow(u_result)
-        hf.print_error((u_result+1.0)*(1-isOut),(xmesh,ymesh),sol)
+#        hf.print_error(error*(1-isOut),(xmesh,ymesh),sol)
 #        plt.matshow((u_result + 1.0 - sol(xmesh,ymesh))*(1-isOut))
-        fig1 = plt.figure(str(it))
-        ax = fig1.gca(projection='3d')
-        ax.plot_surface(xmesh,ymesh,(u_result+1.0 - sol(xmesh,ymesh))*(1-isOut), cmap=cm.coolwarm)
+#        fig1 = plt.figure(str(it))
+#        ax = fig1.gca(projection='3d')
+#        ax.plot_surface(xmesh,ymesh,(u_result+1.0 - sol(xmesh,ymesh))*(1-isOut), cmap=cm.coolwarm)
         
         #animation
-#        plot = ax.plot_surface(xmesh,ymesh,u_result+1.0, animated=True, cmap=cm.coolwarm)
-#        plots.append([plot])
-#    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,
-#                                repeat_delay=0)
+        plot = ax.plot_surface(xmesh,ymesh,error, animated=True, cmap=cm.coolwarm)
+        plots.append([plot])
+    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,
+                                repeat_delay=0)
     return u_result,ani
 
 def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_func_,desired_func_, desired_func_n_,sigma_func_, iteration_total):
@@ -643,14 +654,14 @@ def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_f
     N2 = get_N2(phi)
     Omega_m = np.heaviside(-phi, 1)
     isOut = np.greater(phi,0)
-    #1. Extend g(x,y) off of Gamma, define b throughout N2
+    #1. Extend sigma(x,y) off of Gamma, define sigma throughout N2
     #    xmesh_p = xmesh
     #    ymesh_p = ymesh
     xmesh_p, ymesh_p = projection((xmesh,ymesh),phi_inv)
     sigma_mesh = sigma_func(xmesh_p, ymesh_p)
     
     #2. Extend g(x,y) off of Gamma, define b throughout N2
-    g_ext = desired_func_n_(xmesh_p, ymesh_p)
+    g_ext = desired_func_n_(xmesh_p, ymesh_p) + sigma_mesh * desired_func_(xmesh_p, ymesh_p)
     plt.matshow(g_ext*N2)
     g_mesh = g_ext * N2
     
@@ -673,7 +684,7 @@ def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_f
     for it in range(iteration_total):
         #A1 compute b = g - sigma * a
         ## u + sigma * u_n = g
-        b_mesh = - (g_mesh - a_mesh) / (sigma_mesh + singular_null)
+        b_mesh = - (g_mesh + a_mesh * (sigma_mesh + singular_null)) 
         
         #A2 compute the source term
         source = get_source(-a_mesh, -b_mesh, (xmesh, ymesh), lvl_func_, f_extpl)
@@ -692,30 +703,39 @@ def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_f
         target_0 = N2 * (1-eligible_0)
         u_extpl = extrapolation(u_result, target_0, eligible_0)
         
+        #A5 compute the new a throughout N2
+        a_mesh = - np.copy(u_extpl)
+        
         u_cur_result = np.copy(u_result)
-        hf.print_error((u_result+1.0)*(1-isOut),(xmesh,ymesh),sol)
-        fig1 = plt.figure(str(it))
-        ax = fig1.gca()
-        ax.plot_surface(xmesh,ymesh,(u_result+1.0 - sol(xmesh,ymesh))*(1-isOut), cmap=cm.coolwarm)
+        hf.print_error(u_result, (xmesh,ymesh),sol)
+#        hf.print_error((u_result+1.0)*(1-isOut),(xmesh,ymesh),sol)
+#        fig1 = plt.figure(str(it))
+#        ax = fig1.gca()
+#        ax.plot_surface(xmesh,ymesh,(u_result+1.0 - sol(xmesh,ymesh))*(1-isOut), cmap=cm.coolwarm)
         
     return u_result,ani
 
 if(__name__ == "__main__"):
     plt.close("all")
     
-    setup_grid(129)
-    setup_equations_2()
+    setup_grid(65)
+    setup_equations_3()
     fig_an = plt.figure()
     ax_an = fig_an.gca(projection = '3d')
     phi = lvl_func(xmesh,ymesh)
     N2 = get_N2(phi)
+    plt.matshow(N2)
     
-#    plt.matshow(hf.norm_grad(desired_func(xmesh,ymesh),(xmesh,ymesh),lvl_func))
+    plt.matshow(hf.norm_grad(desired_func(xmesh,ymesh),(xmesh,ymesh),lvl_func))
 #    plt.matshow(u_n_func(xmesh,ymesh))
-#    plt.matshow(desired_func(xmesh,ymesh)*N2)
-    plot = ax_an.plot_surface(xmesh,ymesh,sol_func(xmesh,ymesh), cmap=cm.coolwarm)
-    
-    u_result,ani = poisson_jacobi_source_term_Neumann(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func, desired_func_n,10)
-   
-    
+    plt.matshow(desired_func_n(xmesh,ymesh))
+#    plot = ax_an.plot_surface(xmesh,ymesh,sol_func(xmesh,ymesh), cmap=cm.coolwarm)
+    def sigma(x,y):
+        theta = XYtoTheta(x,y)
+        return 2.5 + 0.25 * x * np.sin(3*theta)
+    sigma_func = sigma
+#    u_result = poisson_jacobi_source_term_Dirichlet(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,10)
+#    u_result,ani = poisson_jacobi_source_term_Neumann(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,30)
+    u_result,ani = poisson_jacobi_source_term_Robin(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,sigma_func,30)
+    plt.show()
 

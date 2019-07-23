@@ -13,6 +13,9 @@ from matplotlib import cm
 def XYtoR(x,y):
     return np.sqrt(x**2+y**2)
 
+def XYtoTheta(x,y):
+    return np.arctan2(y,x)
+
 def grad(f,dx,dy):
 #    ret_x = np.zeros_like(f)
 #    ret_y = np.zeros_like(f)
