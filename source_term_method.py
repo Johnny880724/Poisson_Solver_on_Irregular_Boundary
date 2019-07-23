@@ -639,8 +639,7 @@ def poisson_jacobi_source_term_Neumann(u_init_, maxIterNum_, mesh_,lvl_func_,rhs
         #animation
         plot = ax.plot_surface(xmesh,ymesh,error, animated=True, cmap=cm.coolwarm)
         plots.append([plot])
-    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,
-                                repeat_delay=0)
+    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,repeat_delay=0)
     return u_result,ani
 
 def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_func_,desired_func_, desired_func_n_,sigma_func_, iteration_total):
@@ -680,7 +679,11 @@ def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_f
     def sol_func(x,y):
         return desired_func_(x,y) * (1-isOut)
     sol = sol_func
-    
+    #animation
+    fig = plt.figure()
+    ax = fig.gca(projection = '3d')
+    ax.set_zlim3d(0, 1.0)
+    plots = []
     for it in range(iteration_total):
         #A1 compute b = g - sigma * a
         ## u + sigma * u_n = g
@@ -711,8 +714,10 @@ def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_f
 #        hf.print_error((u_result+1.0)*(1-isOut),(xmesh,ymesh),sol)
 #        fig1 = plt.figure(str(it))
 #        ax = fig1.gca()
-#        ax.plot_surface(xmesh,ymesh,(u_result+1.0 - sol(xmesh,ymesh))*(1-isOut), cmap=cm.coolwarm)
-        
+         #animation
+        plot = ax.plot_surface(xmesh,ymesh,u_result, animated=True, cmap=cm.coolwarm)
+        plots.append([plot])
+    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,repeat_delay=0)
     return u_result,ani
 
 if(__name__ == "__main__"):
@@ -731,11 +736,11 @@ if(__name__ == "__main__"):
     plt.matshow(desired_func_n(xmesh,ymesh))
 #    plot = ax_an.plot_surface(xmesh,ymesh,sol_func(xmesh,ymesh), cmap=cm.coolwarm)
     def sigma(x,y):
-        theta = XYtoTheta(x,y)
+        theta = hf.XYtoTheta(x,y)
         return 2.5 + 0.25 * x * np.sin(3*theta)
     sigma_func = sigma
 #    u_result = poisson_jacobi_source_term_Dirichlet(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,10)
 #    u_result,ani = poisson_jacobi_source_term_Neumann(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,30)
-    u_result,ani = poisson_jacobi_source_term_Robin(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,sigma_func,30)
+    u_result,ani = poisson_jacobi_source_term_Robin(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,sigma_func,20)
     plt.show()
 
