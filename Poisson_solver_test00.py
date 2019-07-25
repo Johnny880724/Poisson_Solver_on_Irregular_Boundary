@@ -121,33 +121,35 @@ if(__name__ == "__main__"):
     plt.close("all")
     
     #convergence plot
-    grid_array = np.array([16,32,64,80,128,160,200,256,300])+1
+    grid_array = np.array([16,32,64,80,128,160,256,300])+1
     L2Dif_array = []
     
     for i in range(len(grid_array)):
         setup_grid(grid_array[i])
         setup_equations("exact")
         u_cur_result = u_init
-        u_result = ps.poisson_jacobi_solver(u_cur_result, 200000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
+        u_result = ps.poisson_jacobi_solver(u_cur_result, grid_array[i]**2 * 10, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
         u_n_result = hf.grad_frame(u_result, (xmesh, ymesh), lvl_func)
     #        plt.matshow(u_n_result)
     #        plt.colorbar()
-        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,"",[False,False,False,False])
-        maxDif, L2Dif = hf.print_error(u_result, (xmesh, ymesh), sol_func)
+#        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,"",[False,False,False,False])
+        frame = hf.get_frame((xmesh,ymesh),lvl_func)
+        maxDif, L2Dif = hf.get_error(u_result, (xmesh, ymesh),frame, sol_func)
         L2Dif_array.append(L2Dif)
     l1=np.log(grid_array)
     l2=np.log(L2Dif_array)
-    plt.plot(l1,l2)
+    plt.plot(l1,l2,marker='.')
     plt.plot(np.linspace(min(l1),max(l1),20),np.linspace(max(l2),max(l2)-2*(max(l1)-min(l1)),20))
     plt.xlabel("log(N_grid)")
     plt.ylabel("log(error)")
-    plt.title("convergence plot for test 00")
-    plt.legend(["result", "slope = -2"])
+    plt.title("convergence plot for boundary capturing method")
+    
     x=l1.reshape((-1,1))
     model = LinearRegression().fit(x, l2)
     plt.plot(x,model.predict(x))
-    plt.plot(l1,l2,".")
+    plt.legend(["result","slope = -2" ,"slope = %g" % model.coef_[0] ])
     #the slope is -1.18543593
+    
     
 else:
     print("Poisson solver imported")

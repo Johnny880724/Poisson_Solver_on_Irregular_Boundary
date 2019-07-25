@@ -38,8 +38,8 @@ def setup_grid(N_grid_val = 101):
 def setup_equations(bnd_type_, beta_p_val = 10000):
     
     #offset center
-    x0 = 0.6
-    y0 = -0.2
+    x0 = 0.0
+    y0 = -0.0
     
     #Poisson equation coefficients
     global beta_p
@@ -49,7 +49,7 @@ def setup_equations(bnd_type_, beta_p_val = 10000):
     
     #rhs solution
     global r0
-    r0 = 0.765467899876
+    r0 = 0.8
     def rhs(x,y):
         return -np.ones_like(x)
     
@@ -235,8 +235,10 @@ def poisson_jacobi_solver(u_init_, maxIterNum_, mesh_, beta_, rhs_func_, lvl_fun
 #    source_bcc[:-1,:] += (b_jump_y * beta_eff_y * ystep / h) * ((1-theta_y)/beta_y_k)
 #    source_bcc[1:,:] +=  (b_jump_y * beta_eff_y * ystep / h) * (theta_y/beta_y_kp1)
     
-    plt.matshow(source)
-    plt.colorbar()
+#    plt.pcolor(xmesh,ymesh,source)
+#    plt.xlabel("x")
+#    plt.ylabel("y")
+#    plt.colorbar()
     #record data
     u_prev = u*(1-isOut)
     global iterNum_record
@@ -280,21 +282,21 @@ def poisson_jacobi_solver(u_init_, maxIterNum_, mesh_, beta_, rhs_func_, lvl_fun
 if(__name__ == "__main__"):
     ##generate poisson solver
     plt.close("all")
-    setup_grid(101)
+    setup_grid(65)
     u_cur_result = u_init
-    setup_equations("Neumann")
+    setup_equations("Dirichlet")
 #    u_result = poisson_jacobi_solver(u_cur_result, 200000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
 #    hf.print_error(u_result, (xmesh, ymesh), sol_func)
     for i in range(10):
-        setup_equations("Neumann")
+        setup_equations("Dirichlet")
         u_result = poisson_jacobi_solver(u_cur_result, 200000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
-        u_n_result = hf.grad_frame(u_result, (xmesh, ymesh), lvl_func)
-        hf.print_error(u_result, (xmesh, ymesh), sol_func)
-#        plt.matshow(u_n_result)
-#        plt.colorbar()
-        fig_label = i
-        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[False,False,False,True])
-        u_cur_result = u_result
+#        u_n_result = hf.grad_frame(u_result, (xmesh, ymesh), lvl_func)
+#        hf.print_error(u_result, (xmesh, ymesh), sol_func)
+##        plt.matshow(u_n_result)
+##        plt.colorbar()
+#        fig_label = i
+#        hf.plot3d_all(u_result, (xmesh, ymesh), sol_func,fig_label,[False,False,False,True])
+#        u_cur_result = u_result
 #    initialize()
 #    u_result2 = poisson_jacobi_solver(u_result1, 100000, (xmesh,ymesh), (beta_p, beta_m),rhs_func, lvl_func, jmp_func)
 #    u_n_result2 = grad_frame(u_result2, (xmesh, ymesh), lvl_func)

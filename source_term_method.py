@@ -19,13 +19,14 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from numpy import linalg as la
 import matplotlib.animation as animation
+import read_write_helper_functions as rw
 
 
 
 #adding to denominator to avoid 0/0 error
 singular_null = 1.0e-30
 
-def setup_grid(N_grid_val = 101):
+def setup_grid(N_grid_val = 100):
     # grid dimension
     grid_min = -1.
     grid_max = 1.
@@ -34,10 +35,10 @@ def setup_grid(N_grid_val = 101):
     N_grid = N_grid_val
     # grid spacing
     global h
-    h = (grid_max - grid_min) / (N_grid - 1) 
+    h = (grid_max - grid_min) / (N_grid) 
     
     # define arrays to hold the x and y coordinates
-    xy = np.linspace(grid_min,grid_max,N_grid)
+    xy = np.linspace(grid_min,grid_max,N_grid+1)
     global xmesh, ymesh
     xmesh, ymesh = np.meshgrid(xy,xy)
     
@@ -149,14 +150,16 @@ def get_source(a, b, mesh, lvl_func_,f_mat_):
     return S_mat
 
 def source_test():
-    setup_grid(101)
+    setup_grid(64)
     setup_equations("exact")
     phi = lvl_func(xmesh, ymesh)
     a_mesh = desired_func(xmesh,ymesh)
     b_mesh = hf.norm_grad(a_mesh, (xmesh,ymesh),lvl_func)
     source = get_source(a_mesh, b_mesh, (xmesh, ymesh), lvl_func, rhs_func(xmesh,ymesh))
-    plt.matshow(source*(1-get_N1(phi)))
-    plt.matshow((1-get_N1(phi)))
+    plt.pcolor(xmesh,ymesh,source)
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.colorbar()
     return H(-phi,h)
 
 #source_test()
@@ -177,24 +180,12 @@ def extrapolation(val_, target_, eligible_):
     val_extpl = val_ * eligible_
     tau_0 = np.copy(target_)
     eps_0 = np.copy(eligible_)
-#    test_symmetry(tau_0,"tau_0")
-#    test_symmetry(eps_0,"eps_0")
     tau = np.copy(tau_0)
     eps = np.copy(eps_0)
     tau_cur = np.copy(tau)
     eps_cur = np.copy(eps)
-#    test_print = 0
 #    print("before extpl: ", hf.ax_symmetry(val_))
     while(np.sum(tau) > 0):
-#        print(hf.ax_symmetry(val_extpl))
-#        plt.matshow(tau)
-#        plt.title("tau")
-#        plt.colorbar()
-#        plt.matshow(eps)
-#        plt.title("eps")
-#        plt.colorbar()
-#        test_print += 1
-#        print("round %d" % test_print)
         val_extpl_temp = np.copy(val_extpl)
         for i in range(len(val_)):
             for j in range(len(val_[i])):
@@ -227,8 +218,6 @@ def extrapolation(val_, target_, eligible_):
         eps = np.copy(eps_cur)
         val_extpl = np.copy(val_extpl_temp)
 #        print("after extpl ", test_print, hf.ax_symmetry(val_extpl))
-#        plt.matshow(val_extpl)
-#        plt.title(str(test_print))
         
     return val_extpl
 
@@ -285,6 +274,13 @@ def setup_equations(beta_p_val = 1.):
     global desired_func_n
     desired_func_n = norm_der
     
+    #for Robin boundary condition
+    def sigma(x,y):
+        theta = hf.XYtoTheta(x,y)
+        return 2.5 + 0.25 * x * np.sin(3*theta)
+    global sigma_func
+    sigma_func = sigma
+    
 #No 1, 5 in the source term paper
 def setup_equations_2(beta_p_val = 1.):
     A = 0.5 * np.pi
@@ -329,7 +325,15 @@ def setup_equations_2(beta_p_val = 1.):
     global desired_func_n
     desired_func_n = norm_der
     
-#No 2, 6, 9
+    #for Robin boundary condition
+    def sigma(x,y):
+        theta = hf.XYtoTheta(x,y)
+        return 2.5 + 0.25 * x * np.sin(3*theta)
+    
+    global sigma_func
+    sigma_func = sigma
+    
+#No 2, 6, 9 in the source term paper
 def setup_equations_3(beta_p_val = 1.):
     A = 2.7
     B = 3.1
@@ -384,6 +388,13 @@ def setup_equations_3(beta_p_val = 1.):
     global desired_func_n
     desired_func_n = norm_der
     
+    #for Robin boundary condition
+    def sigma(x,y):
+        theta = hf.XYtoTheta(x,y)
+        return 2.5 + 0.25 * x * np.sin(3*theta)
+    global sigma_func
+    sigma_func = sigma
+    
 def test_projection():
 #    phi = hf.XYtoR(xmesh, ymesh) - r0
     phi = np.exp(-xmesh**2 - ymesh**2) - np.exp(-r0**2)
@@ -426,7 +437,6 @@ def poisson_jacobi_solver(u_init_,maxIterNum_, mesh_, source_):
     u = u_init_
     global iterNum_record
     iterNum_record = 0
-    maxIterNum_ = 200000
     for i in range(maxIterNum_):
         iterNum_record += 1
         # enforce boundary condition
@@ -443,23 +453,18 @@ def poisson_jacobi_solver(u_init_,maxIterNum_, mesh_, source_):
         del_u = u[1:-1,2:] + u[1:-1,0:-2] + u[2:,1:-1] + u[0:-2,1:-1]
         u_new[1:-1,1:-1] = -h**2/4 * (source_[1:-1,1:-1] - del_u/h**2)
         u = u_new
-        if(i % int(maxIterNum_/100) < 0.1):
+        # check convergence and print process
+        check_convergence_rate = 10**-11
+        if(i % int(maxIterNum_*0.01) < 0.1):
             u_cur = u
             maxDif = np.max(np.abs(u_cur - u_prev)) / np.max(np.abs(u_cur))
             L2Dif = hf.L_n_norm(np.abs(u_cur - u_prev)) / hf.L_n_norm(u_cur)
-            # check convergence and print process
-            check_convergence_rate = 10**-11
-            if(i % int(maxIterNum_/100) < 0.1):
-                u_cur = u
-                maxDif = np.max(np.abs(u_cur - u_prev)) / np.max(np.abs(u_cur))
-                L2Dif = hf.L_n_norm(np.abs(u_cur - u_prev)) / hf.L_n_norm(u_cur)
-                if(L2Dif < check_convergence_rate):
-                    break;
-                else:
-                    u_prev = u_cur
-                sys.stdout.write("\rProgress: %4g%%" % (i *100.0/maxIterNum_))
-                sys.stdout.flush()
-            sys.stdout.write("\rProgress: %4g%%" % (i *100.0/maxIterNum_))
+            if(L2Dif < check_convergence_rate):
+                break;
+            else:
+                u_prev = u_cur
+#            sys.stdout.write("\rProgress: %4g%%" % (i *100.0/maxIterNum_))
+            sys.stdout.write("\rProgress: %4d out of %4d" % (i,maxIterNum_))
             sys.stdout.flush()
         
     print("")
@@ -472,26 +477,30 @@ def test_symmetry(mat, mat_str):
     print( mat_str + " is anti-symmetric : ",hf.anti_ax_symmetry(mat))
     print( mat_str + " is Hermitian : ",hf.Hermitian(mat))
 
-def poisson_jacobi_source_term_Dirichlet(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_func_, desired_func_, iteration_total):
+def poisson_jacobi_source_term_Dirichlet(u_init_, maxMultiple_, mesh_,lvl_func_,rhs_func_,\
+                                         desired_func_, iteration_total, switches = [False,False]):
     xmesh, ymesh = mesh_
     h = xmesh[0,1] - xmesh[0,0]
+    N = len(xmesh)
     phi = lvl_func_(xmesh, ymesh)
     phi_inv = -phi
     grad_result = hf.grad(phi, h, h)
     nx = grad_result[0] / (np.sqrt(grad_result[0]**2 + grad_result[1]**2) + singular_null)
     ny = grad_result[1] / (np.sqrt(grad_result[0]**2 + grad_result[1]**2) + singular_null)
+    maxIterNum_ = maxMultiple_ * N**2
     
     N1 = get_N1(phi)
     N2 = get_N2(phi)
     Omega_m = np.heaviside(-phi, 1)
     isOut = np.greater(phi,0)
     
+    #optional switch for animation, data-writing
+    animation_switch = switches[0]
+    write_data_switch = switches[1]
+    
     #1. Extend g(x,y) off of Gamma, define a throughout N2
-#    xmesh_p = xmesh
-#    ymesh_p = ymesh
     xmesh_p, ymesh_p = projection((xmesh,ymesh),phi_inv)
     g_ext = desired_func_(xmesh_p, ymesh_p)
-    plt.matshow(g_ext * N2)
     a_mesh = -g_ext * N2
     
     #2. extrapolate f throughout N1 U Omega^+
@@ -499,8 +508,6 @@ def poisson_jacobi_source_term_Dirichlet(u_init_, maxIterNum_, mesh_,lvl_func_,r
     eligible_0 = Omega_m * (1-N1)
     target_0 = N1 * (1 - eligible_0)
     f_extpl = extrapolation(f_org, target_0, eligible_0)
-#    plt.matshow(f_extpl)
-#    print("is", hf.ax_symmetry(f_extpl))
     
     #3. initialize b = 0 throughout N2
     b_mesh = np.zeros_like(u_init_)
@@ -510,20 +517,34 @@ def poisson_jacobi_source_term_Dirichlet(u_init_, maxIterNum_, mesh_,lvl_func_,r
         return desired_func_(x,y) * (1-isOut)
     sol = sol_func
     
+    if(animation_switch):
+        fig = plt.figure()
+        ax = fig.gca(projection = '3d')
+        ax.set_zlim3d(0, 1.0)
+        plots = []
+        
+    if(write_data_switch):
+        maxDif_array = []
+        it_array = []
+        L2Dif_array = []
+    
+    #termination array
+    Q_array = np.zeros(iteration_total)
+    
     for it in range(iteration_total):
+        print("This is iteration %d :" % (it + 1))
+        
         #A1 compute the source term
         source = get_source(-a_mesh, -b_mesh, (xmesh, ymesh), lvl_func_, f_extpl)
-#        plt.matshow(source)
         
         #A2 compute the source term with the addition of convergence term
-        if(it > 0):
-            q = 0.75
-            source += (q / h * u_cur_result) * (1-Omega_m) * N2
+        q = min(it,0.75)
+        source += (q / h * u_cur_result) * (1-Omega_m) * N2
             
         #A3 call a Poisson solver resulting in u throughout Omega
-        u_result = poisson_jacobi_solver(u_init_, 400000, (xmesh,ymesh), source)
+        u_result = poisson_jacobi_solver(u_init_, maxIterNum_, (xmesh,ymesh), source)
+        maxDif,L2Dif = hf.get_error(u_result, (xmesh, ymesh), 1-isOut, sol)
         u_cur_result = np.copy(u_result)
-        
         
         #A4 compute u_x, u_y for Omega^- ^ N4 \ N1
         ux, uy = hf.grad(u_result, h, h)
@@ -533,38 +554,67 @@ def poisson_jacobi_source_term_Dirichlet(u_init_, maxIterNum_, mesh_,lvl_func_,r
         target_0 = N1 * (1-eligible_0)
         ux_extpl = extrapolation(ux, target_0, eligible_0)
         uy_extpl = extrapolation(uy, target_0, eligible_0)
-    #    test_symmetry(ux_extpl,"ux")
         
         #A6 compute the new a throughout N2
         b_mesh = - (ux_extpl * nx + uy_extpl * ny)
-#        plt.matshow(b_mesh)
-        if(it %  1 == 0):
-            hf.plot3d_all(u_result*(1-isOut), (xmesh,ymesh),sol,it,[False,False,False,True])
-        hf.print_error(u_result*(1-isOut), (xmesh,ymesh),sol)
-#        plt.matshow(sol(xmesh,ymesh))
-#        plt.matshow(u_result)
         
-    
+        #A7 check for termination
+        Q_array[it] = np.max(u_result * isOut * N2)
+        if(it > 5):
+            if(Q_array[it] >= 0.99 * Q_array[it-1]):
+                break
+        
+        if(animation_switch):
+            plot = ax.plot_surface(xmesh,ymesh,u_result, animated=True, cmap=cm.coolwarm)
+            plots.append([plot])
+            
+        if(write_data_switch):
+            it_array.append(it)
+            maxDif_array.append(maxDif)
+            L2Dif_array.append(L2Dif)
+        
+        #for poster
+#        fig_poster = plt.figure()
+#        plt.rcParams.update({'font.size': 14})
+#        ax_poster = fig_poster.gca(projection = '3d')
+#        ax_poster.plot_surface(xmesh,ymesh,u_result, cmap=cm.coolwarm)
+#        ax_poster.set_title("Iteration = %d" % (it+1))
+#        ax_poster.set_xlabel("x")
+#        ax_poster.set_ylabel("y")
+#        ax_poster.set_zlabel("u")
+#        ax_poster.set_zlim3d(0,2.0)
+        
+    if(write_data_switch):
+        #write data of the error
+        rw.write_float_data("\\source_term_method\\Dirichlet\\Dirichlet_"+str(N-1),[it_array,maxDif_array,L2Dif_array])
+    if(animation_switch):
+        #animate the plots
+        ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,repeat_delay=0)
+        return ani
+        
     return u_result
 
-def poisson_jacobi_source_term_Neumann(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_func_,desired_func_, desired_func_n_, iteration_total):
+def poisson_jacobi_source_term_Neumann(u_init_, maxMultiple_, mesh_,lvl_func_,rhs_func_,\
+                                       desired_func_, desired_func_n_, iteration_total,switches=[False,False]):
     xmesh, ymesh = mesh_
     h = xmesh[0,1] - xmesh[0,0]
+    N = len(xmesh)
     phi = lvl_func_(xmesh, ymesh)
     phi_inv = -phi
-    grad_result = hf.grad(phi, h, h)
     
     N1 = get_N1(phi)
     N2 = get_N2(phi)
     Omega_m = np.heaviside(-phi, 1)
     isOut = np.greater(phi,0)
+    maxIterNum = maxMultiple_ * N**2
+    
+    #optional switch for animation, data-writing
+    animation_switch = switches[0]
+    write_data_switch = switches[1]
     
     #1. Extend g(x,y) off of Gamma, define b throughout N2
-#    xmesh_p = xmesh
-#    ymesh_p = ymesh
     xmesh_p, ymesh_p = projection((xmesh,ymesh),phi_inv)
     g_ext = desired_func_n_(xmesh_p, ymesh_p)
-    plt.matshow(g_ext*N2)
     b_mesh = -g_ext * N2
     
     #2. extrapolate f throughout N1 U Omega^+
@@ -572,8 +622,6 @@ def poisson_jacobi_source_term_Neumann(u_init_, maxIterNum_, mesh_,lvl_func_,rhs
     eligible_0 = Omega_m * (1-N1)
     target_0 = N1 * (1 - eligible_0)
     f_extpl = extrapolation(f_org, target_0, eligible_0)
-#    plt.matshow(f_extpl)
-#    print("is", hf.ax_symmetry(f_extpl))
     
     #3. initialize a = 0 throughout N2
     a_mesh = - u_init_
@@ -583,81 +631,88 @@ def poisson_jacobi_source_term_Neumann(u_init_, maxIterNum_, mesh_,lvl_func_,rhs
         return desired_func_(x,y) * (1-isOut)
     sol = sol_func
     
-    #animation
-    fig = plt.figure()
-    ax = fig.gca(projection = '3d')
-    ax.set_zlim3d(0, 1.0)
-    plots = []
+    if(animation_switch):
+        fig = plt.figure()
+        ax = fig.gca(projection = '3d')
+        ax.set_zlim3d(0, 1.0)
+        plots = []
+        
+    if(write_data_switch):
+        maxDif_array = []
+        it_array = []
+        L2Dif_array = []
+    
+    #termination array
+    Q_array = np.zeros(iteration_total)
     
     for it in range(iteration_total):
-        #A1 compute the source term
+        print("This is iteration %d :" % (it + 1))
+        #A1-1 compute the source term
         source = get_source(-a_mesh, -b_mesh, (xmesh, ymesh), lvl_func_, f_extpl)
-#        plt.matshow(source)
         
-        #A2 compute the source term with the addition of convergence term
+        #A1-2 compute the source term with the addition of convergence term
         q = -0.75 * min(1,it*0.1)
         source += (q / h * u_cur_result) * (1-Omega_m) * N2
             
-        #A3 call a Poisson solver resulting in u throughout Omega
-        u_result = poisson_jacobi_solver(u_init_, 400000, (xmesh,ymesh), source)
-        u_result = u_result * (1-isOut)
-#        plt.matshow(u_result - u_cur_result)
+        #A2 call a Poisson solver resulting in u throughout Omega
+        u_result = poisson_jacobi_solver(u_init_, maxIterNum, (xmesh,ymesh), source)
+        maxDif,L2Dif = hf.get_error_Neumann(u_result, (xmesh, ymesh), 1-isOut, sol)
+        u_cur_result = np.copy(u_result)
     
-        #A4 Extrapolate u throughout N2
+        #A3-1 Extrapolate u throughout N2
         eligible_0 = Omega_m * (1-N1)
         target_0 = N2 * (1-eligible_0)
         u_extpl = extrapolation(u_result, target_0, eligible_0)
-    #    test_symmetry(ux_extpl,"ux")
         
-        #A5 compute the new a throughout N2
-#        plt.matshow(-u_extpl - a_mesh)
-        
+        #A3-2 compute the new a throughout N2
         a_mesh = - np.copy(u_extpl)
         
+        #A4 check for termination
+        Q_array[it] = np.max(u_result * isOut * N2)
+        if(it > 5):
+            if(Q_array[it] >= 0.99 * Q_array[it-1]):
+                break
         
-        u_cur_result = np.copy(u_result)
+        if(animation_switch):
+            plot = ax.plot_surface(xmesh,ymesh,u_result, animated=True, cmap=cm.coolwarm)
+            plots.append([plot])
+            
+        if(write_data_switch):
+            it_array.append(it)
+            maxDif_array.append(maxDif)
+            L2Dif_array.append(L2Dif)
+            
+    if(write_data_switch):
+        #write data of the error
+        rw.write_float_data("\\source_term_method\\Neumann\\Neumann_"+str(N-1),[it_array,maxDif_array,L2Dif_array])
+    if(animation_switch):
+        #animate the plots
+        ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,repeat_delay=0)
+        return ani
         
-        #ploting iterations
-#        if(it %  10 == 0):
-#            hf.plot3d_all(u_result*(1-isOut), (xmesh,ymesh),sol,it,[False,False,False,True])
-        
-        
-        dif = (u_result-sol(xmesh,ymesh))*(1-isOut)
-        error = (dif - np.sum(dif) / np.sum((1-isOut)))*(1-isOut)
-        print(np.max(np.abs(error)))
-#        fig = plt.figure()
-#        ax = fig.gca(projection='3d')
-#        ax.plot_surface(xmesh,ymesh,error)
-#        plt.matshow(sol(xmesh,ymesh))
-#        plt.matshow(u_result)
-#        hf.print_error(error*(1-isOut),(xmesh,ymesh),sol)
-#        plt.matshow((u_result + 1.0 - sol(xmesh,ymesh))*(1-isOut))
-#        fig1 = plt.figure(str(it))
-#        ax = fig1.gca(projection='3d')
-#        ax.plot_surface(xmesh,ymesh,(u_result+1.0 - sol(xmesh,ymesh))*(1-isOut), cmap=cm.coolwarm)
-        
-        #animation
-        plot = ax.plot_surface(xmesh,ymesh,error, animated=True, cmap=cm.coolwarm)
-        plots.append([plot])
-    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,repeat_delay=0)
-    return u_result,ani
+    return u_result
 
-def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_func_,desired_func_, desired_func_n_,sigma_func_, iteration_total):
+def poisson_jacobi_source_term_Robin(u_init_, maxMultiple_, mesh_,lvl_func_,rhs_func_,desired_func_\
+                                     ,desired_func_n_,sigma_func_,iteration_total,switches=[False,False]):
     xmesh, ymesh = mesh_
     h = xmesh[0,1] - xmesh[0,0]
+    N = len(xmesh)
+    maxIterNum = maxMultiple_ * N**2
     phi = lvl_func_(xmesh, ymesh)
     phi_inv = -phi
-    grad_result = hf.grad(phi, h, h)
     
     N1 = get_N1(phi)
     N2 = get_N2(phi)
     Omega_m = np.heaviside(-phi, 1)
     isOut = np.greater(phi,0)
+    
+    #optional switch for animation, data-writing
+    animation_switch = switches[0]
+    write_data_switch = switches[1]
+    
     #1. Extend sigma(x,y) off of Gamma, define sigma throughout N2
-    #    xmesh_p = xmesh
-    #    ymesh_p = ymesh
     xmesh_p, ymesh_p = projection((xmesh,ymesh),phi_inv)
-    sigma_mesh = sigma_func(xmesh_p, ymesh_p)
+    sigma_mesh = sigma_func_(xmesh_p, ymesh_p)
     
     #2. Extend g(x,y) off of Gamma, define b throughout N2
     g_ext = desired_func_n_(xmesh_p, ymesh_p) + sigma_mesh * desired_func_(xmesh_p, ymesh_p)
@@ -669,8 +724,6 @@ def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_f
     eligible_0 = Omega_m * (1-N1)
     target_0 = N1 * (1 - eligible_0)
     f_extpl = extrapolation(f_org, target_0, eligible_0)
-#    plt.matshow(f_extpl)
-#    print("is", hf.ax_symmetry(f_extpl))
     
     #4. initialize a = 0 throughout N2
     a_mesh = - u_init_
@@ -679,14 +732,26 @@ def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_f
     def sol_func(x,y):
         return desired_func_(x,y) * (1-isOut)
     sol = sol_func
-    #animation
-    fig = plt.figure()
-    ax = fig.gca(projection = '3d')
-    ax.set_zlim3d(0, 1.0)
-    plots = []
+    
+    if(animation_switch):
+        fig = plt.figure()
+        ax = fig.gca(projection = '3d')
+        ax.set_zlim3d(0, 1.0)
+        plots = []
+        
+    if(write_data_switch):
+        maxDif_array = []
+        it_array = []
+        L2Dif_array = []
+    
+    #termination array
+    Q_array = np.zeros(iteration_total)
+    
+    
     for it in range(iteration_total):
-        #A1 compute b = g - sigma * a
-        ## u + sigma * u_n = g
+        print("This is iteration %d :" % (it + 1))
+        #A1 compute b = - (g + sigma * a)
+        ##  sigma * u + u_n = g
         b_mesh = - (g_mesh + a_mesh * (sigma_mesh + singular_null)) 
         
         #A2 compute the source term
@@ -697,50 +762,85 @@ def poisson_jacobi_source_term_Robin(u_init_, maxIterNum_, mesh_,lvl_func_,rhs_f
         source += (q / h * u_cur_result) * (1-Omega_m) * N2
             
         #A3 call a Poisson solver resulting in u throughout Omega
-        u_result = poisson_jacobi_solver(u_init_, 400000, (xmesh,ymesh), source)
-        u_result = u_result * (1-isOut)
-#        plt.matshow(u_result - u_cur_result)
+        u_result = poisson_jacobi_solver(u_init_, maxIterNum, (xmesh,ymesh), source)
+        maxDif,L2Dif = hf.get_error(u_result, (xmesh, ymesh), 1-isOut, sol)
+        u_cur_result = np.copy(u_result)
     
-        #A4 Extrapolate u throughout N2
+        #A4-1 Extrapolate u throughout N2
         eligible_0 = Omega_m * (1-N1)
         target_0 = N2 * (1-eligible_0)
         u_extpl = extrapolation(u_result, target_0, eligible_0)
         
-        #A5 compute the new a throughout N2
+        #A4-2 compute the new a throughout N2
         a_mesh = - np.copy(u_extpl)
         
-        u_cur_result = np.copy(u_result)
-        hf.print_error(u_result, (xmesh,ymesh),sol)
-#        hf.print_error((u_result+1.0)*(1-isOut),(xmesh,ymesh),sol)
-#        fig1 = plt.figure(str(it))
-#        ax = fig1.gca()
-         #animation
-        plot = ax.plot_surface(xmesh,ymesh,u_result, animated=True, cmap=cm.coolwarm)
-        plots.append([plot])
-    ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,repeat_delay=0)
-    return u_result,ani
+        #A5 check for termination
+        Q_array[it] = np.max(u_result * isOut * N2)
+        if(it > 5):
+            if(Q_array[it] >= 0.99 * Q_array[it-1]):
+                break
+        
+        #for poster
+#        fig_poster = plt.figure()
+#        plt.rcParams.update({'font.size': 14})
+#        ax_poster = fig_poster.gca(projection = '3d')
+#        ax_poster.plot_surface(xmesh,ymesh,u_result, cmap=cm.coolwarm)
+#        ax_poster.set_title("Iteration = %d" % (it+1))
+#        ax_poster.set_xlabel("x")
+#        ax_poster.set_ylabel("y")
+#        ax_poster.set_zlabel("u")
+#        ax_poster.set_zlim3d(0,2.0)
+        
+        if(animation_switch):
+            plot = ax.plot_surface(xmesh,ymesh,u_result, animated=True, cmap=cm.coolwarm)
+            plots.append([plot])
+            
+        if(write_data_switch):
+            it_array.append(it)
+            maxDif_array.append(maxDif)
+            L2Dif_array.append(L2Dif)
+        
+    if(write_data_switch):
+        #write data of the error
+        rw.write_float_data("\\source_term_method\\Robin\\Robin_"+str(N-1),[it_array,maxDif_array,L2Dif_array])
+    if(animation_switch):
+        #animate the plots
+        ani = animation.ArtistAnimation(fig, plots, interval=300, blit=True,repeat_delay=0)
+        return ani
+    
+    return u_result
 
 if(__name__ == "__main__"):
     plt.close("all")
     
-    setup_grid(65)
+    setup_grid(64)
     setup_equations_3()
-    fig_an = plt.figure()
-    ax_an = fig_an.gca(projection = '3d')
-    phi = lvl_func(xmesh,ymesh)
-    N2 = get_N2(phi)
-    plt.matshow(N2)
     
-    plt.matshow(hf.norm_grad(desired_func(xmesh,ymesh),(xmesh,ymesh),lvl_func))
-#    plt.matshow(u_n_func(xmesh,ymesh))
-    plt.matshow(desired_func_n(xmesh,ymesh))
+    ##show analytical plot
+#    fig_an = plt.figure()
+#    ax_an = fig_an.gca(projection = '3d')
 #    plot = ax_an.plot_surface(xmesh,ymesh,sol_func(xmesh,ymesh), cmap=cm.coolwarm)
-    def sigma(x,y):
-        theta = hf.XYtoTheta(x,y)
-        return 2.5 + 0.25 * x * np.sin(3*theta)
-    sigma_func = sigma
-#    u_result = poisson_jacobi_source_term_Dirichlet(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,10)
-#    u_result,ani = poisson_jacobi_source_term_Neumann(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,30)
-    u_result,ani = poisson_jacobi_source_term_Robin(u_init, 200000, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,sigma_func,20)
-    plt.show()
+    
+#    u_result = poisson_jacobi_source_term_Dirichlet(u_init, 10, (xmesh,ymesh), lvl_func,rhs_func,desired_func,30,[True,False])
+#    u_result = poisson_jacobi_source_term_Neumann(u_init, 10, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,30,[False,True])
+#    u_result = poisson_jacobi_source_term_Robin(u_init, 10, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,sigma_func,30,[True,True])
+   
 
+
+    #convergence plot
+#    iter_num_array = np.array([2**(i+5) for i in range(6)],dtype = int)
+#    iter_num_array = np.array([32,50],dtype = int)
+#    maxDif_array = np.zeros_like(iter_num_array)
+#    for it_conv in range(len(iter_num_array)):
+#        cur_grid_size = iter_num_array[it_conv]
+#        setup_grid(cur_grid_size)
+#        setup_equations_2()
+#        mesh = (xmesh, ymesh)
+#        u_result,ani = poisson_jacobi_source_term_Dirichlet(u_init, 10, mesh, lvl_func,rhs_func,desired_func,50)
+#        print("Error for : %d * %d grid" % (cur_grid_size,cur_grid_size))
+#        maxDif, L2Dif = hf.get_error(u_result, mesh, hf.get_frame(mesh, lvl_func), sol_func)
+#        
+#    plt.plot(np.log(iter_num_array), np.log(np.log(maxDif_array)))
+        
+        
+        

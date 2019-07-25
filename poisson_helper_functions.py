@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 
+
 def XYtoR(x,y):
     return np.sqrt(x**2+y**2)
 
@@ -151,26 +152,43 @@ def Hermitian(u):
         Hermitian = True
     return Hermitian
 
+def get_frame(mesh_, lvl_func_):
+    xmesh, ymesh = mesh_
+    phi = lvl_func_(xmesh, ymesh)
+    isOut = np.greater(phi,0)
+    return 1-isOut
+
 def print_error(u_result_, mesh_, sol_func_):
     xmesh,ymesh = mesh_
     dif = np.abs(u_result_ - sol_func_(xmesh,ymesh))
-#    print(dif)
     L2Dif = L_n_norm(dif,2)
     maxDif = np.max(dif)
-    print("maximum error: ", maxDif)
-    print("L2 error: ", L2Dif)
+    print("Max error : ", maxDif)
+    print("L^2 error : ", L2Dif)
+    print("")
     return maxDif, L2Dif
 
-def print_error_Neumann(u_result_, mesh_, sol_func_):
+def get_error(u_result_, mesh_, frame, sol_func_):
+    xmesh,ymesh = mesh_
+    dif = np.abs(u_result_ - sol_func_(xmesh,ymesh))
+    L2Dif = L_n_norm_frame(dif,frame,2)
+    maxDif = np.max(dif)
+    print("Max error : ", maxDif)
+    print("L^2 error : ", L2Dif)
+    print("")
+    return maxDif, L2Dif
+
+def get_error_Neumann(u_result_, mesh_, frame, sol_func_):
     xmesh,ymesh = mesh_
     dif = np.abs(u_result_ - sol_func_(xmesh,ymesh))
     error = dif - np.mean(dif)
-#    print(dif)
+    dif = (u_result_ - sol_func_(xmesh,ymesh)) * frame
+    error = (dif - np.sum(dif) / np.sum(frame)) * frame
     L2Dif = L_n_norm(error,2)
     maxDif = np.max(error)
-    print("maximum error: ", maxDif)
-    print("L2 error: ", L2Dif)
-    plt.matshow(error)
+    print("Max error (const added) : ", maxDif)
+    print("L^2 error (const added) : ", L2Dif)
+    print("")
     return maxDif, L2Dif
 
 def plot3d_all(u_result_, mesh_, sol_func_,fig_label_, toPlot_ = [True, True, True, True]):
