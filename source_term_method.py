@@ -828,19 +828,35 @@ if(__name__ == "__main__"):
 
 
     #convergence plot
-#    iter_num_array = np.array([2**(i+5) for i in range(6)],dtype = int)
+#    grid_size_array = np.array([2**(i+5) for i in range(4)],dtype = int)
+    grid_size_array = [32,48,64,100,128,192,256]
 #    iter_num_array = np.array([32,50],dtype = int)
-#    maxDif_array = np.zeros_like(iter_num_array)
-#    for it_conv in range(len(iter_num_array)):
-#        cur_grid_size = iter_num_array[it_conv]
-#        setup_grid(cur_grid_size)
-#        setup_equations_2()
-#        mesh = (xmesh, ymesh)
-#        u_result,ani = poisson_jacobi_source_term_Dirichlet(u_init, 10, mesh, lvl_func,rhs_func,desired_func,50)
-#        print("Error for : %d * %d grid" % (cur_grid_size,cur_grid_size))
-#        maxDif, L2Dif = hf.get_error(u_result, mesh, hf.get_frame(mesh, lvl_func), sol_func)
-#        
+    maxDif_array_record = []
+    boundary_type = "Robin"
+    for grid_size in grid_size_array:
+        setup_grid(grid_size)
+        setup_equations_3()
+        mesh = (xmesh, ymesh)
+        maxIter = 50
+        it_multi = 10
+        if(boundary_type == "Dirichlet"):
+            u_result = poisson_jacobi_source_term_Dirichlet(u_init, it_multi, (xmesh,ymesh), lvl_func,rhs_func,desired_func, maxIter,[False,True])
+            print("Error for : %d * %d grid" % (grid_size,grid_size))
+            maxDif_record, L2Dif_record = hf.get_error(u_result, mesh, hf.get_frame(mesh, lvl_func), sol_func)
+            
+        elif(boundary_type == "Neumann"):
+            u_result = poisson_jacobi_source_term_Neumann(u_init, it_multi, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n, maxIter,[False,True])
+            print("Error for : %d * %d grid" % (grid_size,grid_size))
+            maxDif_record, L2Dif_record = hf.get_error_Neumann(u_result, mesh, hf.get_frame(mesh, lvl_func), sol_func)
+        
+        elif(boundary_type == "Robin"):
+            u_result = poisson_jacobi_source_term_Robin(u_init, it_multi, (xmesh,ymesh), lvl_func,rhs_func,desired_func,desired_func_n,sigma_func, maxIter,[False,True])
+            print("Error for : %d * %d grid" % (grid_size,grid_size))
+            maxDif_record, L2Dif_record = hf.get_error(u_result, mesh, hf.get_frame(mesh, lvl_func), sol_func)
+        
+        else:
+            raise("wrong boundary condition!")
+        maxDif_array_record.append(maxDif_record)
+    rw.write_float_data("\\source_term_method\\"+boundary_type+"\\"+boundary_type+"_convergence",[grid_size_array,maxDif_array_record])
 #    plt.plot(np.log(iter_num_array), np.log(np.log(maxDif_array)))
-        
-        
-        
+    
